@@ -1,0 +1,15 @@
+version: 0.0
+os: linux
+files:
+  - source: /src
+    destination: /opt/cms
+  - source: /venv
+    destination: /opt/cms_venv
+hooks:
+  AfterInstall:
+    - location: src/deploy/run-setup.sh
+      timeout: 600
+  ApplicationStart:
+    - location: src/deploy/restart.sh
+      timeout: 60
+
