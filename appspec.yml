@@ -1,0 +1,13 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/cms
+hooks:
+  AfterInstall:
+    - location: deploy/install-deps.sh
+      timeout: 600
+  ApplicationStart:
+    - location: deploy/restart.sh
+      timeout: 60
+
