@@ -45,4 +45,6 @@ chmod +x ./scripts/cmsScoringService
 chmod +x ./scripts/cmsWorker
 chmod +x ./setup.py
 
-./deploy/install-deps.sh
+if [ ! -e /opt/cms_venv/.built-on-codebuild  ];then
+  ./deploy/install-deps.sh
+fi

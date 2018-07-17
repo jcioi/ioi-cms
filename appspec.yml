@@ -1,8 +1,10 @@
 version: 0.0
 os: linux
 files:
-  - source: /
+  - source: /src
     destination: /opt/cms
+  - source: /venv
+    destination: /opt/cms_venv
 hooks:
   AfterInstall:
     - location: deploy/run-setup.sh

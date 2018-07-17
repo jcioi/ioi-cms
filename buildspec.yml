@@ -1,0 +1,25 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - sudo mkdir -p /opt
+      - sudo chown `whoami` /opt
+      - sudo mkdir -p /opt/cms_venv
+      - if [ -e /opt/cms_venv.cache ]; then shasum -c /opt/cms_venv.cache || rm -rf /opt/cms_venv && mkdir -p /opt/cms_venv; fi
+      - ./deploy/install-deps.sh
+      - shasum requirements.txt > /opt/cms_venv.cache
+      - mkdir -p /out/
+      - cp -av . /out/src
+      - cp -av /opt/cms_venv/ /out/venv
+      - touch /out/venv/.built-on-codebuild
+      
+artifacts:
+  files:
+    - '**/*'
+  base_directory: '/out'
+
+cache:
+  paths:
+    - '/opt/cms_venv.cache'
+    - '/opt/cms_venv/**/*'
