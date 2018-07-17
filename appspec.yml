@@ -5,7 +5,7 @@ files:
     destination: /opt/cms
 hooks:
   AfterInstall:
-    - location: deploy/install-deps.sh
+    - location: deploy/run-setup.sh
       timeout: 600
   ApplicationStart:
     - location: deploy/restart.sh
