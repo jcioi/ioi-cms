@@ -467,8 +467,8 @@ class NullBackend(FileCacherBackend):
 import boto3
 import botocore
 class S3Backend(FileCacherBackend):
-    class S3Body(object):
-        def __init__(streaming_body):
+    class _S3Body(object):
+        def __init__(self, streaming_body):
             self.body = streaming_body
 
         def __enter__(self):
@@ -502,10 +502,10 @@ class S3Backend(FileCacherBackend):
             except self.s3.exceptions.NoSuchKey:
                 raise KeyError("File not found.")
 
-            return S3Body(resp['Body'])
+            return S3Backend._S3Body(resp['Body'])
 
     def create_file(self, digest):
-        temp_file = tempfile.NamedTemporaryFile('wb', delete=False,
+        temp_file = tempfile.NamedTemporaryFile('w+b', delete=False,
                                                 prefix=".s3backendtmp.",
                                                 suffix=digest)
         return temp_file
