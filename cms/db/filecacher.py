@@ -588,7 +588,7 @@ class FileCacher(object):
         if null:
             self.backend = NullBackend()
         elif path is None:
-            self.backend = S3Backend()
+            self.backend = S3Backend(region=config.s3_backend_region, bucket=config.s3_backend_bucket, prefix=config.s3_backend_prefix)
         else:
             self.backend = FSBackend(path)
 

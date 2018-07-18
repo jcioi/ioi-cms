@@ -202,6 +202,10 @@ class Config(object):
             paths += [os.path.join("/", "usr", "local", "etc", "cms.conf"),
                       os.path.join("/", "etc", "cms.conf")]
 
+        self.s3_backend_region = os.environ.get('AWS_REGION','ap-northeast-1')
+        self.s3_backend_bucket = None
+        self.s3_backend_prefix = ''
+
         # Allow user to override config file path using environment
         # variable 'CMS_CONFIG'.
         CMS_CONFIG_ENV_VAR = "CMS_CONFIG"
