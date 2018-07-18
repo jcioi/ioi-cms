@@ -506,6 +506,7 @@ class S3Backend(FileCacherBackend):
 
         fobj.seek(0)
         self.s3.upload_fileobj(fobj, Bucket=self.bucket, Key=key)
+        fobj.close()
         os.unlink(fobj.name)
 
     def _head_object(self, digest):
