@@ -11,6 +11,7 @@ phases:
       - ./deploy/install-deps.sh
       - shasum requirements.txt > /opt/cms_venv.cache
       - mkdir -p /out/
+      - cp appspec.yml /out/
       - cp -av . /out/src
       - cp -av /opt/cms_venv/ /out/venv
       - touch /out/venv/.built-on-codebuild
