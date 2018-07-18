@@ -464,6 +464,106 @@ class NullBackend(FileCacherBackend):
     def list(self):
         return list()
 
+import boto3
+import botocore
+class S3Backend(FileCacherBackend):
+    class _S3Body(object):
+        def __init__(self, streaming_body):
+            self.body = streaming_body
+
+        def __enter__(self):
+            return self.body
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.body.close()
+            if exc_type or exc_value or traceback:
+                return False
+            return True
+
+    def __init__(self, region, bucket, prefix='', s3_proxy=None, base_url_for_fetch=None):
+        self.s3 = boto3.client('s3', region)
+        self.bucket = bucket
+        self.prefix = prefix
+        self.base_url_for_fetch = base_url_for_fetch
+
+    def _s3_key(self, digest):
+        return "%s%s/%s" % (self.prefix, digest[0:2], digest)
+
+    def get_file(self, digest):
+        key = self._s3_key(digest)
+        if self.base_url_for_fetch:
+            raise KeyError("TODO:")
+        else:
+            try:
+                resp = self.s3.get_object(
+                        Bucket=self.bucket,
+                        Key=key,
+                    )
+            except self.s3.exceptions.NoSuchKey:
+                raise KeyError("File not found.")
+
+            return S3Backend._S3Body(resp['Body'])
+
+    def create_file(self, digest):
+        temp_file = tempfile.NamedTemporaryFile('w+b', delete=False,
+                                                prefix=".s3backendtmp.",
+                                                suffix=digest)
+        return temp_file
+
+    def commit_file(self, fobj, digest, desc=""):
+        key = self._s3_key(digest)
+        try:
+            self.s3.head_object(Bucket=self.bucket, Key=key)
+            os.unlink(fobj.name)
+            fobj.close()
+            return None
+        except botocore.exceptions.ClientError as e:
+            if e.response.get('Error',{}).get('Code',None) == '404':
+                pass
+            else:
+                fobj.close()
+                raise e
+
+        fobj.seek(0)
+        self.s3.upload_fileobj(fobj, Bucket=self.bucket, Key=key)
+        fobj.close()
+        os.unlink(fobj.name)
+
+    def _head_object(self, digest):
+        try:
+            return self.s3.head_object(Bucket=self.bucket, Key=self._s3_key(digest))
+        except self.s3.exceptions.NoSuchKey:
+            raise KeyError("File not found.")
+        except botocore.exceptions.ClientError as e:
+            if e.response.get('Error',{}).get('Code',None) == '404':
+                raise KeyError("File not found.")
+            else:
+                raise e
+
+    def describe(self, digest):
+        self._head_object(digest)
+        return ""
+
+    def get_size(self, digest):
+        return self._head_object(digest)['ContentLength']
+
+    def delete(self, digest):
+        key = self._s3_key(digest)
+        try:
+            self.s3.delete_object(Bucket=self.bucket, Key=key)
+            return None
+        except self.s3.exceptions.NoSuchKey:
+            pass
+
+    def list(self):
+        paginator = self.s3.get_paginator('list_objects_v2')
+        prefix = self.prefix if self.prefix and self.prefix != '' else None
+        pager = paginator.paginate(Bucket=self.bucket,Prefix=prefix)
+
+        result = [(content['Key'].split('/')[-1], "") for page in pager for content in pager['Contents']]
+        return result
+
+
 
 class FileCacher(object):
     """This class implement a local cache for files stored as FSObject
@@ -513,7 +613,7 @@ class FileCacher(object):
         if null:
             self.backend = NullBackend()
         elif path is None:
-            self.backend = DBBackend()
+            self.backend = S3Backend(region=config.s3_backend_region, bucket=config.s3_backend_bucket, prefix=config.s3_backend_prefix)
         else:
             self.backend = FSBackend(path)
 
