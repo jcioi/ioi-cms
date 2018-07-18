@@ -5,6 +5,8 @@ phases:
     commands:
       - mkdir -p /opt/cms_venv
       - if [ -e /opt/cms_venv.cache ]; then shasum -c /opt/cms_venv.cache || rm -rf /opt/cms_venv && mkdir -p /opt/cms_venv; fi
+      - chmod +x ./deploy/*.sh
+      - ./deploy/chmod.sh
       - ./deploy/install-deps.sh
       - shasum requirements.txt > /opt/cms_venv.cache
       - mkdir -p /out/
