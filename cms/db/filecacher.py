@@ -465,6 +465,7 @@ class NullBackend(FileCacherBackend):
         return list()
 
 import boto3
+import botocore
 class S3Backend(FileCacherBackend):
     def __init__(self, region, bucket, prefix='', s3_proxy=None, base_url_for_fetch=None):
         self.s3 = boto3.client('s3', region)
