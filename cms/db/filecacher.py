@@ -472,7 +472,7 @@ class S3Backend(FileCacherBackend):
         self.prefix = prefix
         self.base_url_for_fetch = base_url_for_fetch
 
-    def _s3_key(digest):
+    def _s3_key(self, digest):
         return "%s%s/%s" % (self.prefix, digest[0:2], digest)
 
     def get_file(self, digest):
@@ -491,7 +491,7 @@ class S3Backend(FileCacherBackend):
             return resp['Body']
 
     def create_file(self, digest):
-        temp_file = tempfile.TemporaryFile('wb', delete=False,
+        temp_file = tempfile.NamedTemporaryFile('wb', delete=False,
                                                 prefix=".s3backendtmp.",
                                                 suffix=digest)
         return temp_file
@@ -501,8 +501,12 @@ class S3Backend(FileCacherBackend):
         try:
             self.s3.head_object(Bucket=self.bucket, Key=key)
             return None
-        except self.s3.exceptions.NoSuchKey:
-            pass
+        except botocore.exceptions.ClientError as e:
+            if e.get('Error',{}).get('Code',None) == 404:
+                pass
+            else:
+                fobj.close()
+                raise e
 
         fobj.seek(0)
         self.s3.upload_fileobj(fobj, Bucket=self.bucket, Key=key)
@@ -514,6 +518,11 @@ class S3Backend(FileCacherBackend):
             return self.s3.head_object(Bucket=self.bucket, Key=self._s3_key(digest))
         except self.s3.exceptions.NoSuchKey:
             raise KeyError("File not found.")
+        except botocore.exceptions.ClientError as e:
+            if e.get('Error',{}).get('Code',None) == 404:
+                raise KeyError("File not found.")
+            else:
+                raise e
 
     def describe(self, digest):
         self._head_object(digest)
