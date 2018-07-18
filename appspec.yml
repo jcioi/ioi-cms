@@ -7,9 +7,9 @@ files:
     destination: /opt/cms_venv
 hooks:
   AfterInstall:
-    - location: deploy/run-setup.sh
+    - location: src/deploy/run-setup.sh
       timeout: 600
   ApplicationStart:
-    - location: deploy/restart.sh
+    - location: src/deploy/restart.sh
       timeout: 60
 
