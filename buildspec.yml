@@ -6,7 +6,6 @@ phases:
       - mkdir -p /opt/cms_venv
       - if [ -e /opt/cms_venv.cache ]; then shasum -c /opt/cms_venv.cache || rm -rf /opt/cms_venv /opt/cms_venv.cache; fi
       - if [ ! -e /opt/cms_venv.cache ]; then mkdir -p /opt/cms_venv; fi
-      - if [ ! -e /opt/cms_venv.cache ]; then apt-get update; apt-get install -y python3 python3-venv python3-pip python3-dev build-essential gettext libpq-dev libcups2-dev libyaml-dev libffi-dev; fi
       - chmod +x ./deploy/*.sh
       - ./deploy/chmod.sh
       - ./deploy/install-deps.sh
