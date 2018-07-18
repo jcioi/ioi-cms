@@ -501,9 +501,11 @@ class S3Backend(FileCacherBackend):
         key = self._s3_key(digest)
         try:
             self.s3.head_object(Bucket=self.bucket, Key=key)
+            os.unlink(fobj.name)
+            fobj.close()
             return None
         except botocore.exceptions.ClientError as e:
-            if e.get('Error',{}).get('Code',None) == 404:
+            if e.response.get('Error',{}).get('Code',None) == '404':
                 pass
             else:
                 fobj.close()
@@ -520,7 +522,7 @@ class S3Backend(FileCacherBackend):
         except self.s3.exceptions.NoSuchKey:
             raise KeyError("File not found.")
         except botocore.exceptions.ClientError as e:
-            if e.get('Error',{}).get('Code',None) == 404:
+            if e.response.get('Error',{}).get('Code',None) == '404':
                 raise KeyError("File not found.")
             else:
                 raise e
@@ -684,7 +686,7 @@ class FileCacher(object):
 
             logger.debug("File %s downloaded.", digest)
 
-        return io.open(cache_file_path, 'rb')
+        return io.open(cache_file_path, 'r+b')
 
     def get_file_content(self, digest):
         """Retrieve a file from the storage.
