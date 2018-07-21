@@ -345,7 +345,7 @@ class EventSource(object):
         # We subscribe to the publisher to receive events.
         sub = self._pub.get_subscriber(last_event_id)
 
-        max_age = 1
+        max_age = 19
         if sub.is_something_available():
             max_age = 10800
         # Initialize the response and get the write() callback. The
