@@ -201,6 +201,15 @@ class Subscriber(object):
         except Empty:
             pass
 
+    def is_something_available(self):
+        try:
+            self._queue.peek_nowait()
+            return True
+        except Empty:
+            return False
+        return False # Safe-guard
+
+
 
 class EventSource(object):
     """A class that implements a Server-Sent Events [1] handler.
@@ -307,26 +316,6 @@ class EventSource(object):
         if request.accept_mimetypes.quality("text/event-stream") <= 0:
             return NotAcceptable()(environ, start_response)
 
-        # Initialize the response and get the write() callback. The
-        # Cache-Control header is useless for conforming clients, as
-        # the spec. already imposes that behavior on them, but we set
-        # it explicitly to avoid unwanted caching by unaware proxies and
-        # middlewares.
-        write = start_response(
-            text_to_native_str("200 OK"),
-            [(text_to_native_str("Content-Type"),
-              text_to_native_str("text/event-stream; charset=utf-8")),
-             (text_to_native_str("Cache-Control"),
-              text_to_native_str("public, max-age=1")),
-              ])
-
-        # This is a part of the fourth hack (see above).
-        if hasattr(start_response, "__self__") and \
-                isinstance(start_response.__self__, WSGIHandler):
-            handler = start_response.__self__
-        else:
-            handler = None
-
         # One-shot means that we will terminate the request after the
         # first batch of sent events. We do this when we believe the
         # client doesn't support chunked transfer. As this encoding has
@@ -355,6 +344,31 @@ class EventSource(object):
 
         # We subscribe to the publisher to receive events.
         sub = self._pub.get_subscriber(last_event_id)
+
+        max_age = 1
+        if sub.is_something_available():
+            max_age = 10800
+        # Initialize the response and get the write() callback. The
+        # Cache-Control header is useless for conforming clients, as
+        # the spec. already imposes that behavior on them, but we set
+        # it explicitly to avoid unwanted caching by unaware proxies and
+        # middlewares.
+        write = start_response(
+            text_to_native_str("200 OK"),
+            [(text_to_native_str("Content-Type"),
+              text_to_native_str("text/event-stream; charset=utf-8")),
+             (text_to_native_str("Cache-Control"),
+              text_to_native_str("public, max-age=%d" % (max_age))),
+              ])
+
+        # This is a part of the fourth hack (see above).
+        if hasattr(start_response, "__self__") and \
+                isinstance(start_response.__self__, WSGIHandler):
+            handler = start_response.__self__
+        else:
+            handler = None
+
+
 
         # Send some data down the pipe. We need that to make the user
         # agent announces the connection (see the spec.). Since it's a
