@@ -495,6 +495,7 @@ class S3Backend(FileCacherBackend):
                 return False
             return True
 
+    def __init__(self, region, bucket, prefix='', s3_proxy=None, base_url_for_fetch=None):
         if s3_proxy:
             config = botocore.config.Config(proxies={'http': s3_proxy, 'https': s3_proxy})
         else:
