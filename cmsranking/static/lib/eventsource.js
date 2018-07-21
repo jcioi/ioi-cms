@@ -33,7 +33,6 @@ var EventSource = function (url) {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', eventsource.URL, true);
       xhr.setRequestHeader('Accept', 'text/event-stream');
-      xhr.setRequestHeader('Cache-Control', 'no-cache');
       // we must make use of this on the server side if we're working with Android - because they don't trigger
       // readychange until the server connection is closed
       xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');

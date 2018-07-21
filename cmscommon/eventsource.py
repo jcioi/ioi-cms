@@ -217,9 +217,9 @@ class EventSource(object):
     as well.
 
     """
-    _GLOBAL_TIMEOUT = 600
+    _GLOBAL_TIMEOUT = 50
     _WRITE_TIMEOUT = 30
-    _PING_TIMEOUT = 15
+    _PING_TIMEOUT = 20
 
     _CACHE_SIZE = 250
 
@@ -317,7 +317,8 @@ class EventSource(object):
             [(text_to_native_str("Content-Type"),
               text_to_native_str("text/event-stream; charset=utf-8")),
              (text_to_native_str("Cache-Control"),
-              text_to_native_str("no-cache"))])
+              text_to_native_str("public, max-age=19")),
+              ])
 
         # This is a part of the fourth hack (see above).
         if hasattr(start_response, "__self__") and \
@@ -334,10 +335,9 @@ class EventSource(object):
         # XMLHttpRequest it has been probably sent from a polyfill (not
         # from the native browser implementation) which will be able to
         # read the response body only when it has been fully received.
-        if environ["SERVER_PROTOCOL"] != "HTTP/1.1" or request.is_xhr:
-            one_shot = True
-        else:
-            one_shot = False
+
+        # IOI 2018 custom: Always one_shot
+        one_shot = True
 
         # As for the Server-Sent Events [1] spec., this is the way for
         # the client to tell us the ID of the last event it received
@@ -400,7 +400,7 @@ class EventSource(object):
 
                 # If we decided this is one-shot, stop the long-poll as
                 # soon as we sent the client some real data.
-                if one_shot and got_sth:
+                if one_shot:
                     break
 
         # An empty iterable tells the server not to send anything.
