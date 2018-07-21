@@ -466,7 +466,22 @@ class NullBackend(FileCacherBackend):
 
 import boto3
 import botocore
+from  botocore.vendored import requests
 class S3Backend(FileCacherBackend):
+    class _RequestsBody(object):
+        def __init__(self, requests_response):
+            self.resp = requests_response
+
+        def __enter__(self):
+            return self.requests_response.raw
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.requests_response.close()
+            if exc_type or exc_value or traceback:
+                return False
+            return True
+
+
     class _S3Body(object):
         def __init__(self, streaming_body):
             self.body = streaming_body
@@ -481,18 +496,34 @@ class S3Backend(FileCacherBackend):
             return True
 
     def __init__(self, region, bucket, prefix='', s3_proxy=None, base_url_for_fetch=None):
-        self.s3 = boto3.client('s3', region)
+        if s3_proxy:
+            config = botocore.config.Config(proxies={'http': s3_proxy, 'https': s3_proxy})
+        else:
+            config = None
+        self.s3 = boto3.client('s3', region, config=config)
+
         self.bucket = bucket
         self.prefix = prefix
         self.base_url_for_fetch = base_url_for_fetch
+        if self.base_url_for_fetch:
+            self.http = requests.Session()
 
     def _s3_key(self, digest):
         return "%s%s/%s" % (self.prefix, digest[0:2], digest)
 
     def get_file(self, digest):
         key = self._s3_key(digest)
-        if self.base_url_for_fetch:
-            raise KeyError("TODO:")
+        if self.http:
+            url = "%s%s" % (self.base_url_for_fetch, key)
+            resp = self.http.get(url, timeout=5, stream=True)
+            if resp.status_code == 404:
+                resp.close()
+                raise KeyError("File not found.")
+            elif not resp.ok:
+                resp.close()
+                resp.raise_for_status()
+
+            return S3Backend._RequestsBody(resp)
         else:
             try:
                 resp = self.s3.get_object(
@@ -613,7 +644,13 @@ class FileCacher(object):
         if null:
             self.backend = NullBackend()
         elif path is None:
-            self.backend = S3Backend(region=config.s3_backend_region, bucket=config.s3_backend_bucket, prefix=config.s3_backend_prefix)
+            self.backend = S3Backend(
+                    region=config.s3_backend_region,
+                    bucket=config.s3_backend_bucket,
+                    prefix=config.s3_backend_prefix,
+                    s3_proxy=config.s3_backend_proxy,
+                    base_url_for_fetch=config.s3_backend_fetch_base_url,
+                    )
         else:
             self.backend = FSBackend(path)
 
