@@ -823,6 +823,7 @@ var DataStore = new function () {
         self.es.addEventListener("open", self.es_open_handler, false);
         self.es.addEventListener("error", self.es_error_handler, false);
         self.es.addEventListener("reload", self.es_reload_handler, false);
+        self.es.addEventListener("reinit", function(e) { location.reload(); }, false);
         self.es.addEventListener("contest", function (event) {
             var timestamp = parseInt(event.lastEventId, 16) / 1000000;
             if (timestamp > self.contest_init_time) {

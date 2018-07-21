@@ -154,7 +154,7 @@ class Publisher(object):
                         queue.put(msg)
             else:
                 # Some events may be missing. Ask to reinit.
-                queue.put(b"event:reinit\n\n")
+                queue.put(b"event:reinit\ndata:reinit\n\n")
         # Store the queue and return a subscriber bound to it.
         self._sub_queues.add(queue)
         return Subscriber(queue)
