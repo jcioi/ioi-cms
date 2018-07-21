@@ -860,10 +860,16 @@ var DataStore = new function () {
         }, false);
     };
 
+    self.reconnecting_message_timer = null;
     self.update_network_status = function (state) {
+        if (state != 0 && self.reconnecting_message_timer) {
+          clearTimeout(self.reconnecting_message_timer);
+        }
         if (state == 0) { // self.es.CONNECTING
-            $("#ConnectionStatus_box").attr("data-status", "reconnecting");
-            $("#ConnectionStatus_text").text("You are disconnected from the server but your browser is trying to connect.");
+            self.reconnecting_message_timer = setTimeout(function() {
+              $("#ConnectionStatus_box").attr("data-status", "reconnecting");
+              $("#ConnectionStatus_text").text("You are disconnected from the server but your browser is trying to connect.");
+            }, 30000);
         } else if (state == 1) { // self.es.OPEN
             $("#ConnectionStatus_box").attr("data-status", "connected");
             $("#ConnectionStatus_text").text("You are connected to the server and are receiving live updates.");
