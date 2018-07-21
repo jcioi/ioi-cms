@@ -317,7 +317,7 @@ class EventSource(object):
             [(text_to_native_str("Content-Type"),
               text_to_native_str("text/event-stream; charset=utf-8")),
              (text_to_native_str("Cache-Control"),
-              text_to_native_str("public, max-age=19")),
+              text_to_native_str("public, max-age=1")),
               ])
 
         # This is a part of the fourth hack (see above).
