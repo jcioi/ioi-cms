@@ -342,9 +342,17 @@ class EventSource(object):
         # the EventSource and create a new one. To obtain that behavior
         # again we give the "last_event_id" as a URL query parameter
         # (with lower priority, to have the header override it).
-        last_event_id = request.headers.get("Last-Event-ID")
-        if last_event_id is None:
-            last_event_id = request.args.get("last_event_id")
+        last_event_id_header = request.headers.get("Last-Event-ID")
+        if last_event_id_header is None:
+            last_event_id_header = request.args.get("last_event_id")
+
+        last_event_id = None
+        client_tries = 0
+        if last_event_id_header is not None:
+            last_event_id_values = last_event_id_header.split('-')
+            last_event_id = last_event_id_values[0]
+            if len(last_event_id_values) >= 2:
+                client_tries = int(last_event_id_values[1])
 
         # We subscribe to the publisher to receive events.
         sub = self._pub.get_subscriber(last_event_id)
@@ -377,7 +385,10 @@ class EventSource(object):
         # Send some data down the pipe. We need that to make the user
         # agent announces the connection (see the spec.). Since it's a
         # comment it will be ignored.
-        write(b"retry: 1000\n\n")
+        if last_event_id is None:
+            write(b"retry: 1000\n\n")
+        else:
+            write(b"retry: 1000\n\nid: %b-%d\nevent: hello\ndata: hello\n\n" % (bytes(last_event_id, 'utf-8'), client_tries + 1))
 
         # XXX We could make the client change its reconnection timeout
         # by sending a "retry:" line.
