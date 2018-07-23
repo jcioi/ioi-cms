@@ -105,6 +105,8 @@ class Store(object):
                     mtime = os.path.getmtime(path)
                     if latest_timestamp == None or latest_timestamp < mtime:
                         latest_timestamp = mtime
+            if latest_timestamp == None:
+                self.timestamp = time.time()
             self.timestamp = latest_timestamp
         except OSError:
             # the path isn't a directory or is inaccessible
