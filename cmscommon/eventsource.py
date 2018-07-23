@@ -155,7 +155,7 @@ class Publisher(object):
                             queue.put(msg)
                 else:
                     # XXX: debugging purpose below
-                    print(self._queue)
+                    print(self._cache)
                     print(last_event_key)
                     # Some events may be missing. Ask to reinit.
                     queue.put(b"event:reinit\ndata:reinit\n\n")
