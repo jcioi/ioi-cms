@@ -154,6 +154,9 @@ class Publisher(object):
                         if key > last_event_key:
                             queue.put(msg)
                 else:
+                    # XXX: debugging purpose below
+                    print(self._queue)
+                    print(last_event_key)
                     # Some events may be missing. Ask to reinit.
                     queue.put(b"event:reinit\ndata:reinit\n\n")
         # Store the queue and return a subscriber bound to it.
