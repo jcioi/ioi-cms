@@ -76,6 +76,11 @@ class Store(object):
         self._update_callbacks = list()
         self._delete_callbacks = list()
 
+        self.timestamp = None
+
+    def _update_timestamp():
+        self.timestamp = time.time()
+
     def load_from_disk(self):
         """Load the initial data for this store from the disk.
 
@@ -87,14 +92,20 @@ class Store(object):
             pass
 
         try:
+            latest_timestamp = None
             for name in os.listdir(self._path):
                 # TODO check that the key is '[A-Za-z0-9_]+'
                 if name[-5:] == '.json' and name[:-5] != '':
-                    with io.open(os.path.join(self._path, name), 'rb') as rec:
+                    path = os.path.join(self._path, name)
+                    with io.open(path, 'rb') as rec:
                         item = self._entity()
                         item.set(json.load(rec))
                         item.key = name[:-5]
                         self._store[name[:-5]] = item
+                    mtime = os.path.getmime(name)
+                    if latest_timestamp == None or latest_timestamp < mtime:
+                        latest_timestamp = mtime
+            self.timestamp = latest_timestamp
         except OSError:
             # the path isn't a directory or is inaccessible
             logger.error("Path is not a directory or is not accessible",
@@ -162,6 +173,7 @@ class Store(object):
             item.key = key
             self._store[key] = item
             # notify callbacks
+            self._update_timestamp()
             for callback in self._create_callbacks:
                 callback(key, item)
             # reflect changes on the persistent storage
@@ -205,6 +217,7 @@ class Store(object):
             old_item = self._store[key]
             self._store[key] = item
             # notify callbacks
+            self._update_timestamp()
             for callback in self._update_callbacks:
                 callback(key, old_item, item)
             # reflect changes on the persistent storage
@@ -261,6 +274,7 @@ class Store(object):
                 # insert entity
                 self._store[key] = value
                 # notify callbacks
+                self._update_timestamp()
                 if is_new:
                     for callback in self._create_callbacks:
                         callback(key, value)
@@ -305,6 +319,7 @@ class Store(object):
                     if not o_value.consistent(self._all_stores):
                         depend.delete(o_key)
             # notify callbacks
+            self._update_timestamp()
             for callback in self._delete_callbacks:
                 callback(key, old_value)
             # reflect changes on the persistent storage
