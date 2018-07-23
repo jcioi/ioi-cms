@@ -80,7 +80,7 @@ class Store(object):
 
         self.timestamp = None
 
-    def _update_timestamp():
+    def _update_timestamp(self):
         self.timestamp = time.time()
 
     def load_from_disk(self):
