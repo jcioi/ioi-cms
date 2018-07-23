@@ -386,7 +386,7 @@ class ScoreHandler(object):
 
         response = Response()
         response.status_code = 200
-        response.headers['Timestamp'] = "%0.6f" % self.scoring_store.timestamp
+        response.headers['Timestamp'] = "%0.6f" % self.scoring_store.timestamp()
         response.mimetype = "application/json"
         response.data = json.dumps(result)
 
