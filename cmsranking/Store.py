@@ -82,6 +82,7 @@ class Store(object):
 
     def _update_timestamp(self):
         self.timestamp = time.time()
+        print("AAAADEBUGAAAA updated %s timestamp to %f" % (self._entity, self.timestamp))
 
     def load_from_disk(self):
         """Load the initial data for this store from the disk.
@@ -179,7 +180,7 @@ class Store(object):
             # notify callbacks
             self._update_timestamp()
             for callback in self._create_callbacks:
-                callback(key, item)
+                callback(self.timestamp, key, item)
             # reflect changes on the persistent storage
             try:
                 path = os.path.join(self._path, key + '.json')
@@ -223,7 +224,7 @@ class Store(object):
             # notify callbacks
             self._update_timestamp()
             for callback in self._update_callbacks:
-                callback(key, old_item, item)
+                callback(self.timestamp, key, old_item, item)
             # reflect changes on the persistent storage
             try:
                 path = os.path.join(self._path, key + '.json')
@@ -281,10 +282,10 @@ class Store(object):
                 self._update_timestamp()
                 if is_new:
                     for callback in self._create_callbacks:
-                        callback(key, value)
+                        callback(self.timestamp, key, value)
                 else:
                     for callback in self._update_callbacks:
-                        callback(key, old_value, value)
+                        callback(self.timestamp, key, old_value, value)
                 # reflect changes on the persistent storage
                 try:
                     path = os.path.join(self._path, key + '.json')
@@ -325,7 +326,7 @@ class Store(object):
             # notify callbacks
             self._update_timestamp()
             for callback in self._delete_callbacks:
-                callback(key, old_value)
+                callback(self.timestamp, key, old_value)
             # reflect changes on the persistent storage
             try:
                 os.remove(os.path.join(self._path, key + '.json'))

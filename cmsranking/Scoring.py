@@ -260,10 +260,11 @@ class ScoringStore(object):
         finishes loading the data from disk.
 
         """
+        timestamp = self.timestamp()
         for key, value in iteritems(self.submission_store._store):
-            self.create_submission(key, value)
+            self.create_submission(timestamp, key, value)
         for key, value in sorted(iteritems(self.subchange_store._store)):
-            self.create_subchange(key, value)
+            self.create_subchange(timestamp, key, value)
 
     def add_score_callback(self, callback):
         """Add a callback to be called when a score changes.
@@ -274,11 +275,11 @@ class ScoringStore(object):
         """
         self._callbacks.append(callback)
 
-    def notify_callbacks(self, user, task, score):
+    def notify_callbacks(self, user, task, score, timestamp):
         for call in self._callbacks:
-            call(user, task, score)
+            call(user, task, score, timestamp)
 
-    def create_submission(self, key, submission):
+    def create_submission(self, timestamp, key, submission):
         if submission.user not in self._scores:
             self._scores[submission.user] = dict()
         if submission.task not in self._scores[submission.user]:
@@ -291,9 +292,9 @@ class ScoringStore(object):
         score_obj.create_submission(key, submission)
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
-    def update_submission(self, key, old_submission, submission):
+    def update_submission(self, timestamp, key, old_submission, submission):
         if old_submission.user != submission.user or \
                 old_submission.task != submission.task:
             # TODO Delete all subchanges from the Score of the old
@@ -310,15 +311,15 @@ class ScoringStore(object):
         score_obj.update_score_mode(task["score_mode"])
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
-    def delete_submission(self, key, submission):
+    def delete_submission(self, timestamp, key, submission):
         score_obj = self._scores[submission.user][submission.task]
         old_score = score_obj.get_score()
         score_obj.delete_submission(key)
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
         if len(self._scores[submission.user][submission.task]
                ._submissions) == 0:
@@ -326,16 +327,16 @@ class ScoringStore(object):
         if len(self._scores[submission.user]) == 0:
             del self._scores[submission.user]
 
-    def create_subchange(self, key, subchange):
+    def create_subchange(self, timestamp, key, subchange):
         submission = self.submission_store._store[subchange.submission]
         score_obj = self._scores[submission.user][submission.task]
         old_score = score_obj.get_score()
         score_obj.create_subchange(key, subchange)
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
-    def update_subchange(self, key, old_subchange, subchange):
+    def update_subchange(self, timestamp, key, old_subchange, subchange):
         if old_subchange.submission != subchange.submission:
             self.delete_subchange(key, old_subchange)
             self.create_subchange(key, subchange)
@@ -347,9 +348,9 @@ class ScoringStore(object):
         score_obj.update_subchange(key, subchange)
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
-    def delete_subchange(self, key, subchange):
+    def delete_subchange(self, timestamp, key, subchange):
         if subchange.submission not in self.submission_store:
             # Submission has just been deleted. We cannot retrieve the
             # user and the task, so we cannot clean up the Score obj.
@@ -361,7 +362,7 @@ class ScoringStore(object):
         score_obj.delete_subchange(key)
         new_score = score_obj.get_score()
         if old_score != new_score:
-            self.notify_callbacks(submission.user, submission.task, new_score)
+            self.notify_callbacks(submission.user, submission.task, new_score, self.timestamp())
 
     def get_score(self, user, task):
         if user not in self._scores or task not in self._scores[user]:

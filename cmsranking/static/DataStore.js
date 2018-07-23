@@ -807,7 +807,7 @@ var DataStore = new function () {
 
     self.create_event_source = function () {
         if (self.last_event_id == null) {
-            self.last_event_id = Math.round(Math.min(self.contest_init_time,
+            self.last_event_id = Math.round(Math.max(self.contest_init_time,
                                                      self.task_init_time,
                                                      self.team_init_time,
                                                      self.user_init_time,

@@ -287,12 +287,14 @@ class DataWatcher(EventSource):
 
         stores["scoring"].add_score_callback(self.score_callback)
 
-    def callback(self, entity, event, key, *args):
-        self.send(entity, "%s %s" % (event, key))
+    def callback(self, entity, event, timestamp, key, *args):
+        print("AAAADEBUGAAAA sending %s event at %f" % (entity, timestamp))
+        self.send(entity, "%s %s" % (event, key), timestamp=timestamp)
 
-    def score_callback(self, user, task, score):
+    def score_callback(self, user, task, score, timestamp):
         # FIXME Use score_precision.
-        self.send("score", "%s %s %0.2f" % (user, task, score))
+        print("AAAADEBUGAAAA sending score at %f" % (timestamp))
+        self.send("score", "%s %s %0.2f" % (user, task, score), timestamp=timestamp)
 
 
 class SubListHandler(object):

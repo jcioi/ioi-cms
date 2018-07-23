@@ -109,7 +109,7 @@ class Publisher(object):
         # when no one else is using (i.e. fetching from) them.
         self._sub_queues = WeakSet()
 
-    def put(self, event, data):
+    def put(self, event, data, timestamp=None):
         """Dispatch a new item to all subscribers.
 
         See format_event for details about the parameters.
@@ -119,7 +119,10 @@ class Publisher(object):
 
         """
         # Number of microseconds since epoch.
-        key = int(time.time() * 1000000)
+        if timestamp is None:
+            key = int(time.time() * 1000000)
+        else:
+            key = int(timestamp * 1000000)
         msg = format_event("%x" % key, event, data)
         # Put into cache.
         self._cache.append((key, msg))
@@ -148,14 +151,16 @@ class Publisher(object):
                 re.match("^[0-9A-Fa-f]+$", last_event_id):
             last_event_key = int(last_event_id, 16)
             if len(self._cache) > 0:
-                if last_event_key >= self._cache[0][0]:
-                    # All missed events are in cache.
+                if self._cache[0][0] <= last_event_key:
+                    # Send all missed events from cache
                     for key, msg in self._cache:
                         if key > last_event_key:
                             queue.put(msg)
-                else:
+                else: # Some events are missing, suggest client to reload
                     # XXX: debugging purpose below
                     print(self._cache)
+                    print(self._cache[0][0])
+                    print(self._cache[-1][0])
                     print(last_event_key)
                     # Some events may be missing. Ask to reinit.
                     queue.put(b"event:reinit\ndata:reinit\n\n")
@@ -242,7 +247,7 @@ class EventSource(object):
         """
         self._pub = Publisher(self._CACHE_SIZE)
 
-    def send(self, event, data):
+    def send(self, event, data, timestamp):
         """Send the event to the stream.
 
         Intended for subclasses to push new events to clients. See
@@ -252,7 +257,7 @@ class EventSource(object):
         data (unicode): the data of the event.
 
         """
-        self._pub.put(event, data)
+        self._pub.put(event, data, timestamp)
 
     def __call__(self, environ, start_response):
         """Execute this instance as a WSGI application.
