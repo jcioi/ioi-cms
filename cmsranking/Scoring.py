@@ -251,7 +251,7 @@ class ScoringStore(object):
         self._callbacks = list()
 
     def timestamp(self):
-        max([self.task_store.timestamp, self.submission_store.timestamp, self.subchange_store.timestamp])
+        return max([self.task_store.timestamp, self.submission_store.timestamp, self.subchange_store.timestamp])
 
     def init_store(self):
         """Load the scores from the stores.
