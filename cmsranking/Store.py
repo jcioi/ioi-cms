@@ -102,7 +102,7 @@ class Store(object):
                         item.set(json.load(rec))
                         item.key = name[:-5]
                         self._store[name[:-5]] = item
-                    mtime = os.path.getmime(name)
+                    mtime = os.path.getmtime(path)
                     if latest_timestamp == None or latest_timestamp < mtime:
                         latest_timestamp = mtime
             self.timestamp = latest_timestamp
