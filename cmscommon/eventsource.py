@@ -374,7 +374,7 @@ class EventSource(object):
         # Send some data down the pipe. We need that to make the user
         # agent announces the connection (see the spec.). Since it's a
         # comment it will be ignored.
-        write(b":\n")
+        write(b"retry: 1000\n\n")
 
         # XXX We could make the client change its reconnection timeout
         # by sending a "retry:" line.
