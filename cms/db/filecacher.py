@@ -357,7 +357,7 @@ class DBBackend(FileCacherBackend):
 
                 session.commit()
 
-                logger.info("File %s (%s) stored on the database.",
+                logger.debug("File %s (%s) stored on the database.",
                             digest, desc)
 
         except IntegrityError:
