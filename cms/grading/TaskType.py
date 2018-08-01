@@ -408,13 +408,29 @@ class TaskType(with_metaclass(ABCMeta, object)):
         pass
 
     @abstractmethod
-    def get_auto_managers(self):
+    def get_auto_managers_for_compilation(self, language, dataset):
         """Return the managers that must be provided by the
         EvaluationService (picking them from the Task) when compiling
-        or evaluating a user test.
+        a user test.
 
-        return (list of str): a list of filenames (they may include a
-                             '%l' as a "language wildcard").
+        language (Language): the language user provides
+        dataset (Dataset): the dataset the user test is requested for
+
+        return (list of str): a list of filenames.
+
+        """
+        pass
+
+    @abstractmethod
+    def get_auto_managers_for_evaluation(self, language, dataset):
+        """Return the managers that must be provided by the
+        EvaluationService (picking them from the Task) when evaluating
+        a user test.
+
+        language (Language): the language user provides
+        dataset (Dataset): the dataset the user test is requested for
+
+        return (list of str): a list of filenames.
 
         """
         pass

@@ -132,9 +132,17 @@ class Communication(TaskType):
         """See TaskType.get_user_managers."""
         return ["stub.%l"]
 
-    def get_auto_managers(self):
-        """See TaskType.get_auto_managers."""
-        return ["manager"]
+    def get_auto_managers_for_compilation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_compilation."""
+        auto_managers = []
+        for filename, manager in iteritems(dataset.managers):
+            if is_manager_for_compilation(filename, language):
+                auto_managers.append(filename)
+        return auto_managers
+
+    def get_auto_managers_for_evaluation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_evaluation."""
+        return [Communication.MANAGER_FILENAME]
 
     @staticmethod
     def _executable_filename(codenames):

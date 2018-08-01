@@ -371,18 +371,9 @@ class CompilationJob(Job):
             language = None
         managers = dict(user_test.managers)
         task_type = dataset.task_type_object
-        auto_managers = task_type.get_auto_managers()
-        if auto_managers is not None:
-            for manager_filename in auto_managers:
-                if manager_filename.endswith(".%l") and language is not None:
-                    manager_filename = manager_filename.replace(
-                        ".%l", language.source_extension)
-                managers[manager_filename] = dataset.managers[manager_filename]
-        else:
-            for manager_filename in dataset.managers:
-                if manager_filename not in managers:
-                    managers[manager_filename] = \
-                        dataset.managers[manager_filename]
+        auto_managers = task_type.get_auto_managers_for_compilation(language, dataset)
+        for manager_filename in auto_managers:
+            managers[manager_filename] = dataset.managers[manager_filename]
 
         return CompilationJob(
             operation=operation.to_dict(),
@@ -607,18 +598,9 @@ class EvaluationJob(Job):
         language = get_language(user_test.language)
         managers = dict(user_test.managers)
         task_type = dataset.task_type_object
-        auto_managers = task_type.get_auto_managers()
-        if auto_managers is not None:
-            for manager_filename in auto_managers:
-                if manager_filename.endswith(".%l") and language is not None:
-                    manager_filename = manager_filename.replace(
-                        ".%l", language.source_extension)
-                managers[manager_filename] = dataset.managers[manager_filename]
-        else:
-            for manager_filename in dataset.managers:
-                if manager_filename not in managers:
-                    managers[manager_filename] = \
-                        dataset.managers[manager_filename]
+        auto_managers = task_type.get_auto_managers_for_evaluation(language, dataset)
+        for manager_filename in auto_managers:
+            managers[manager_filename] = dataset.managers[manager_filename]
 
         return EvaluationJob(
             operation=operation.to_dict(),

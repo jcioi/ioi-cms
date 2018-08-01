@@ -138,8 +138,12 @@ class TwoSteps(TaskType):
         """See TaskType.get_user_managers."""
         return ["manager.%l"]
 
-    def get_auto_managers(self):
-        """See TaskType.get_auto_managers."""
+    def get_auto_managers_for_compilation(self, language, managers):
+        """See TaskType.get_auto_managers_for_compilation."""
+        return []
+
+    def get_auto_managers_for_evaluation(self, language, managers):
+        """See TaskType.get_auto_managers_for_evaluation."""
         return []
 
     def _uses_checker(self):

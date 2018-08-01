@@ -168,8 +168,16 @@ class Batch(TaskType):
         else:
             return []
 
-    def get_auto_managers(self):
-        """See TaskType.get_auto_managers."""
+    def get_auto_managers_for_compilation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_compilation."""
+        auto_managers = []
+        for filename, manager in iteritems(dataset.managers):
+            if is_manager_for_compilation(filename, language):
+                auto_managers.append(filename)
+        return auto_managers
+
+    def get_auto_managers_for_evaluation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_evaluation."""
         return []
 
     def _uses_grader(self):

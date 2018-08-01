@@ -97,8 +97,12 @@ class OutputOnly(TaskType):
         """See TaskType.get_user_managers."""
         return []
 
-    def get_auto_managers(self):
-        """See TaskType.get_auto_managers."""
+    def get_auto_managers_for_compilation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_compilation."""
+        return []
+
+    def get_auto_managers_for_evaluation(self, language, dataset):
+        """See TaskType.get_auto_managers_for_evaluation."""
         return []
 
     def _uses_checker(self):
