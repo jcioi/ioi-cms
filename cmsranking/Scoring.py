@@ -25,7 +25,7 @@ from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 from six import itervalues, iteritems
 
-from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST
+from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX_SUBTASK
 
 import heapq
 import logging
@@ -126,6 +126,9 @@ class Score(object):
         elif self._score_mode == SCORE_MODE_MAX_TOKENED_LAST:
             score = max(self._released.query(),
                         self._last.score if self._last is not None else 0.0)
+        elif self._score_mode == SCORE_MODE_MAX_SUBTASK:
+            # FIXME: compute the score
+            score = 0
 
         if score != self.get_score():
             self._history.append((change.time, score))

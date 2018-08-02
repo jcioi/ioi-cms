@@ -38,6 +38,7 @@ import cms.log
 
 __all__ = [
     "__version__",
+    "SCORE_MODE_MAX_SUBTASK",
     "SCORE_MODE_MAX", "SCORE_MODE_MAX_TOKENED_LAST", "TOKEN_MODE_DISABLED",
     "TOKEN_MODE_FINITE", "TOKEN_MODE_INFINITE", "TOKEN_MODE_MIXED",
     # log
@@ -60,6 +61,8 @@ __version__ = '1.4.dev0'
 
 # Task score modes.
 
+# Sum of the maximum subtask scores among all submissions.
+SCORE_MODE_MAX_SUBTASK = "max_subtask"
 # Maximum score amongst all submissions.
 SCORE_MODE_MAX = "max"
 # Maximum score among all tokened submissions and the last submission.

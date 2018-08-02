@@ -148,6 +148,7 @@ class Sum(ScoreTypeAlone):
             else:
                 public_testcases.append({"idx": idx})
 
+        # FIXME: broken
         return score, testcases, public_score, public_testcases, []
 
     def get_public_outcome(self, outcome):
