@@ -207,6 +207,7 @@ class Config(object):
         self.s3_backend_prefix = ''
         self.s3_backend_proxy = None
         self.s3_backend_fetch_base_url = None
+        self.s3_backend_enabled = True
 
         # Allow user to override config file path using environment
         # variable 'CMS_CONFIG'.
