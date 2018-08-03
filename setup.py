@@ -181,6 +181,7 @@ setup(
             "GroupMin=cms.grading.scoretypes.GroupMin:GroupMin",
             "GroupMul=cms.grading.scoretypes.GroupMul:GroupMul",
             "GroupThreshold=cms.grading.scoretypes.GroupThreshold:GroupThreshold",
+            "GroupMinTruncation=cms.grading.scoretypes.GroupMinTruncation:GroupMinTruncation",
         ],
         "cms.grading.languages": [
             "C++14 / g++=cms.grading.languages.cpp14_gpp:Cpp14Gpp",
