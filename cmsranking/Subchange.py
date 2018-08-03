@@ -36,6 +36,7 @@ class Subchange(Entity):
     - score (float): optional, the new score
     - token (bool): optional, the new token status
     - extra ([unicode]): optional, the new details
+    - subtask_scores ([float]): optional, the new subtask scores
 
     """
     def __init__(self):
@@ -48,6 +49,7 @@ class Subchange(Entity):
         self.score = None
         self.token = None
         self.extra = None
+        self.subtask_scores = None
 
     @staticmethod
     def validate(data):
@@ -75,6 +77,13 @@ class Subchange(Entity):
                 for i in data['extra']:
                     assert isinstance(i, str), \
                         "Field 'extra' isn't a list of strings"
+            if 'subtask_scores' in data:
+                assert isinstance(data['subtask_scores'], list), \
+                    "Field 'subtask_scores' isn't a list of floats"
+                for i in data['subtask_scores']:
+                    assert isinstance(i, float), \
+                        "Field 'subtask_scores' isn't a list of floats"
+
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc.message)
         except AssertionError as exc:
@@ -87,11 +96,12 @@ class Subchange(Entity):
         self.score = (data['score'] if 'score' in data else None)
         self.token = (data['token'] if 'token' in data else None)
         self.extra = (data['extra'] if 'extra' in data else None)
+        self.subtask_scores = (data['subtask_scores'] if 'subtask_scores' in data else None)
 
     def get(self):
         result = self.__dict__.copy()
         del result['key']
-        for field in ['score', 'token', 'extra']:
+        for field in ['score', 'token', 'extra', 'subtask_scores']:
             if result[field] is None:
                 del result[field]
         return result
