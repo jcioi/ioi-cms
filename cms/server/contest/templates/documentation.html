@@ -14,7 +14,7 @@
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".cpp") %}
 <h3>C++</h3>
 
-<p><a href="{{ url("stl", "en", "index.html") }}">{% trans %}Standard Template Library{% endtrans %}</a></p>
+<p>Documentation for C++ is provided in the contestant workstation.</p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".java") %}
