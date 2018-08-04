@@ -276,7 +276,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         default_conf_path = os.path.join(base_path, default_conf_path_rel)
         if exists(default_conf_path):
             default_conf = load_yaml(default_conf_path)
-            default_assign(conf, default_conf, 'primary_lang')
+            default_assign(conf, default_conf, 'primary_language')
             default_assign(conf, default_conf, 'max_submission_number')
             default_assign(conf, default_conf, 'min_submission_interval')
         else:
