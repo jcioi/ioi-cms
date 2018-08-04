@@ -162,11 +162,12 @@ class ScoreType(with_metaclass(ABCMeta, object)):
         unused_submission_result (SubmissionResult): the submission
             result of which we want the score
 
-        return (float, object, float, object, [str]): respectively: the
-            score, an opaque JSON-like data structure with additional
+        return (float, [float], object, float, [float], object, [str]):
+            respectively: the score, the subtask scores,
+            an opaque JSON-like data structure with additional
             information (e.g. testcases' and subtasks' score) that will
-            be converted to HTML by get_html_details, the score and a
-            similar data structure from the point of view of a user who
+            be converted to HTML by get_html_details, the score and two
+            similar data structures from the point of view of a user who
             did not play a token, the list of strings to send to RWS.
 
         """
@@ -369,13 +370,16 @@ class ScoreTypeGroup(ScoreTypeAlone):
         """See ScoreType.compute_score."""
         # Actually, this means it didn't even compile!
         if not submission_result.evaluated():
-            return 0.0, [], 0.0, [], ["%lg" % 0.0 for _ in self.parameters]
+            return 0.0, [0.0], [], 0.0, [0.0], [], ["%lg" % 0.0 for _ in self.parameters]
 
         score = 0
         subtasks = []
         public_score = 0
         public_subtasks = []
         ranking_details = []
+
+        st_scores = []
+        public_st_scores = []
 
         targets = self.retrieve_target_testcases()
         evaluations = {ev.codename: ev for ev in submission_result.evaluations}
@@ -406,6 +410,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             st_score = st_score_fraction * parameter[0]
 
             score += st_score
+            st_scores.append(st_score)
             subtasks.append({
                 "idx": st_idx + 1,
                 # We store the fraction so that an "example" testcase
@@ -414,15 +419,19 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 "score_fraction": st_score_fraction,
                 "max_score": parameter[0],
                 "testcases": testcases})
+
             if all(self.public_testcases[tc_idx] for tc_idx in target):
                 public_score += st_score
+                public_st_scores.append(st_score)
                 public_subtasks.append(subtasks[-1])
             else:
+                public_st_scores.append(0.0)
                 public_subtasks.append({"idx": st_idx + 1,
                                         "testcases": public_testcases})
             ranking_details.append("%g" % round(st_score, 2))
 
-        return score, subtasks, public_score, public_subtasks, ranking_details
+        return score, st_scores, subtasks, public_score, public_st_scores, \
+            public_subtasks, ranking_details
 
     @abstractmethod
     def get_public_outcome(self, unused_outcome, unused_parameter):
