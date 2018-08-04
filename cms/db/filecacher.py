@@ -357,7 +357,7 @@ class DBBackend(FileCacherBackend):
 
                 session.commit()
 
-                logger.info("File %s (%s) stored on the database.",
+                logger.debug("File %s (%s) stored on the database.",
                             digest, desc)
 
         except IntegrityError:
@@ -644,13 +644,16 @@ class FileCacher(object):
         if null:
             self.backend = NullBackend()
         elif path is None:
-            self.backend = S3Backend(
-                    region=config.s3_backend_region,
-                    bucket=config.s3_backend_bucket,
-                    prefix=config.s3_backend_prefix,
-                    s3_proxy=config.s3_backend_proxy,
-                    base_url_for_fetch=config.s3_backend_fetch_base_url,
-                    )
+            if config.s3_backend_enabled:
+                self.backend = S3Backend(
+                        region=config.s3_backend_region,
+                        bucket=config.s3_backend_bucket,
+                        prefix=config.s3_backend_prefix,
+                        s3_proxy=config.s3_backend_proxy,
+                        base_url_for_fetch=config.s3_backend_fetch_base_url,
+                        )
+            else:
+                self.backend = DBBackend()
         else:
             self.backend = FSBackend(path)
 

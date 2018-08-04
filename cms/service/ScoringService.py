@@ -104,8 +104,10 @@ class ScoringExecutor(Executor):
 
             # Compute score and fill it in the database.
             submission_result.score, \
+                submission_result.subtask_scores, \
                 submission_result.score_details, \
                 submission_result.public_score, \
+                submission_result.public_subtask_scores, \
                 submission_result.public_score_details, \
                 submission_result.ranking_score_details = \
                 score_type.compute_score(submission_result)

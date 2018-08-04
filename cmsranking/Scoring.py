@@ -25,6 +25,8 @@ from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 from six import itervalues, iteritems
 
+from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX_SUBTASK
+
 import heapq
 import logging
 
@@ -110,6 +112,8 @@ class Score(object):
             self._submissions[s_id].token = change.token
         if change.extra is not None:
             self._submissions[s_id].extra = change.extra
+        if change.subtask_scores is not None:
+            self._submissions[s_id].subtask_scores = change.subtask_scores
         if self._submissions[s_id].token:
             self._released.insert(self._submissions[s_id].score)
         if change.score is not None and \
@@ -117,13 +121,22 @@ class Score(object):
                  self._submissions[s_id].time > self._last.time):
             self._last = self._submissions[s_id]
 
-        if self._score_mode == "max":
+        if self._score_mode == SCORE_MODE_MAX:
             score = max([0.0] +
                         [submission.score
                          for submission in itervalues(self._submissions)])
-        else:
+        elif self._score_mode == SCORE_MODE_MAX_TOKENED_LAST:
             score = max(self._released.query(),
                         self._last.score if self._last is not None else 0.0)
+        elif self._score_mode == SCORE_MODE_MAX_SUBTASK:
+            max_scores = []
+            for s in itervalues(self._submissions):
+                len_diff = len(s.subtask_scores) - len(max_scores)
+                if len_diff > 0:
+                    max_scores = max_scores + [0.0] * len_diff
+                for idx, sc in enumerate(s.subtask_scores):
+                    max_scores[idx] = max(max_scores[idx], sc)
+            score = sum(max_scores)
 
         if score != self.get_score():
             self._history.append((change.time, score))
@@ -142,6 +155,7 @@ class Score(object):
             sub.score = 0.0
             sub.token = False
             sub.extra = list()
+            sub.subtask_scores = list()
 
         # Append each change, one at a time.
         for change in self._changes:
@@ -196,6 +210,7 @@ class Score(object):
         submission.score = 0.0
         submission.token = False
         submission.extra = list()
+        submission.subtask_scores = list()
         self._submissions[key] = submission
 
     def update_submission(self, key, submission):

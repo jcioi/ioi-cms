@@ -181,8 +181,10 @@ setup(
             "GroupMin=cms.grading.scoretypes.GroupMin:GroupMin",
             "GroupMul=cms.grading.scoretypes.GroupMul:GroupMul",
             "GroupThreshold=cms.grading.scoretypes.GroupThreshold:GroupThreshold",
+            "GroupMinTruncation=cms.grading.scoretypes.GroupMinTruncation:GroupMinTruncation",
         ],
         "cms.grading.languages": [
+            "C++14 / g++=cms.grading.languages.cpp14_gpp:Cpp14Gpp",
             "C++11 / g++=cms.grading.languages.cpp11_gpp:Cpp11Gpp",
             "C11 / gcc=cms.grading.languages.c11_gcc:C11Gcc",
             "C# / Mono=cms.grading.languages.csharp_mono:CSharpMono",

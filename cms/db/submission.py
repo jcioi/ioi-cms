@@ -384,6 +384,16 @@ class SubmissionResult(Base):
         JSONB,
         nullable=True)
 
+    # Subtask scores as computed by ScoringService.
+    # Null means not yes scored.
+    # This is essential when score mode is SCORE_MODE_MAX_SUBTASK.
+    subtask_scores = Column(
+        ARRAY(Float),
+        nullable=True)
+    public_subtask_scores = Column(
+        ARRAY(Float),
+        nullable=True)
+
     # Ranking score details. It is a list of strings that are going to
     # be shown in a single row in the table of submission in RWS.
     ranking_score_details = Column(

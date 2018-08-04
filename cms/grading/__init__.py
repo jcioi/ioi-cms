@@ -37,7 +37,7 @@ from collections import namedtuple
 
 from sqlalchemy.orm import joinedload
 
-from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST
+from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX_SUBTASK
 from cms.db import Submission
 from cms.locale import DEFAULT_TRANSLATION
 
@@ -237,6 +237,27 @@ def task_score(participation, task):
                 partial = True
 
         score = max(last_score, max_tokened_score)
+
+    elif task.score_mode == SCORE_MODE_MAX_SUBTASK:
+        # Like in IOI 2017-: sum of the maximum scores of subtasks.
+
+        max_scores = []
+
+        for s in submissions:
+
+            sr = s.get_result(task.active_dataset)
+            if sr is None or not sr.scored():
+                partial = True
+                continue
+            scores = list(sr.subtask_scores)
+
+            if len(max_scores) < len(scores):
+                max_scores.extend([0.0] * (len(scores) - len(max_scores)))
+
+            for idx, sc in enumerate(scores):
+                max_scores[idx] = max(max_scores[idx], sc)
+
+        score = sum(max_scores)
 
     else:
         raise ValueError("Unknown score mode '%s'" % task.score_mode)
