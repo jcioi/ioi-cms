@@ -272,7 +272,8 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         conf['token_mode'] = TOKEN_MODE_DISABLED
 
         # inherited default
-        default_conf_path = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH, DEFAULT_CONF_PATH)
+        default_conf_path_rel = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH, DEFAULT_CONF_PATH)
+        default_conf_path = os.path.join(base_path, default_conf_path_rel)
         if exists(default_conf_path):
             default_conf = load_yaml(default_conf_path)
             default_assign(conf, default_conf, 'primary_lang')
