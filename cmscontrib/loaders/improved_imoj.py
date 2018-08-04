@@ -497,7 +497,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
             task['submission_format'] =  [
                 'output_%s.txt' % codename
-                for codename in testcases.keys()]
+                for codename in sorted(testcases.keys())]
             dataset['task_type'] = 'OutputOnly'
             dataset['task_type_parameters'] = [eval_param]
 
