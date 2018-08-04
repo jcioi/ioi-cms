@@ -5,80 +5,61 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import io
-import logging
-import os
-import os.path
-import sys
-import tempfile
-import zipfile
-import yaml
-import json
-import re
-from io import StringIO
+import re, logging, io, os, subprocess, tempfile, zipfile, datetime
+import yaml, json
+from os.path import exists
 from dateutil import parser, tz
-from datetime import timedelta
 
-from cms import SCORE_MODE_MAX
-from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS, get_language
+from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, TOKEN_MODE_DISABLED
+from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS, SOURCE_EXTS
 from cms.db import Contest, User, Task, Statement, Attachment, \
     Dataset, Manager, Testcase
-from cmscontrib import touch
 from cmscommon.crypto import build_password
 
 from .base_loader import ContestLoader, TaskLoader, UserLoader
 
+
+AUTO_COMPILATION_CMD = ['g++', '--std=c++14', '-O2', '-Wall']
+ENVVAR_NAME_DEFAULT_CONF_PATH = 'CMS_DEFAULT_TASK_CONF_PATH'
+DEFAULT_CONF_PATH = os.path.join('..', 'default-task-iif.yaml')
+
 logger = logging.getLogger(__name__)
 
-
-# Patch PyYAML to make it load all strings as unicode instead of str
-# (see http://stackoverflow.com/questions/2890146).
-def construct_yaml_str(self, node):
-    return self.construct_scalar(node)
-yaml.Loader.add_constructor('tag:yaml.org,2002:str', construct_yaml_str)
-yaml.SafeLoader.add_constructor('tag:yaml.org,2002:str', construct_yaml_str)
-
+def load_yaml(path):
+    return yaml.safe_load(io.open(path, encoding='utf-8'))
 def make_timedelta(t):
-    return timedelta(seconds=t)
-
+    return datetime.timedelta(seconds=t)
 def make_datetime(s):
     return parser.parse(s).astimezone(tz.tzutc()).replace(tzinfo=None)
 
-def load_yaml(path):
-    return yaml.safe_load(io.open(path, 'rt', encoding='utf-8'))
-
-def same_path(a, b):
-    return os.path.normpath(a) == os.path.normpath(b)
-
-def get_mtime(fname):
-    return os.stat(fname).st_mtime
-
-def convert_glob_to_regexp(g):
+def glob_to_regexp(g):
     SPECIAL_CHARS = '\\.^$+{}[]|()'
     for c in SPECIAL_CHARS:
         g = g.replace(c, '\\' + c)
     g = g.replace('*', '.*')
     g = g.replace('?', '.')
     return g
-def convert_globlist_to_regexp(gs):
-    rs = ['(' + convert_glob_to_regexp(g) + ')' for g in gs]
+def globlist_to_text(gs):
+    rs = ['(' + glob_to_regexp(g) + ')' for g in gs]
     return '\A' + '|'.join(rs) + '\Z'
+def globlist_to_regexp(gs):
+    return re.compile(globlist_to_text(gs))
 
-def try_assign(dest, src, keyname, conv=lambda i:i):
-    if keyname in src:
-        dest[keyname] = conv(src[keyname])
-def assign(dest, src, keyname, conv=lambda i:i):
-    dest[keyname] = conv(src[keyname])
+def try_assign(dest, src, key, conv=lambda i:i):
+    if key in src:
+        dest[key] = conv(src[key])
+def default_assign(dest, src, key, conv=lambda i:i):
+    if key in src:
+        dest.setdefault(key, conv(src[key]))
+def assign(dest, src, key, conv=lambda i:i):
+    dest[key] = conv(src[key])
 
+class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
-# FIXME: split the class
-#        (before splitting, we must rebuild the structure around loaders)
-class ImprovedImoJudgeFormatLoader(ContestLoader, TaskLoader, UserLoader):
-
-    """Load a contest, task or user stored using Improved ImoJudge format.
+    """Load a contest, task or user stored using Improved Imoj format.
 
     Given the filesystem location of a contest, task or user, stored
-    using Improved ImoJudge format, parse those files and directories
+    using Improved Imoj format, parse those files and directories
     to produce data that can be consumed by CMS.
     This format is INCOMPATIBLE with former ImoJudge-like format (used in 2015).
 
@@ -92,642 +73,586 @@ class ImprovedImoJudgeFormatLoader(ContestLoader, TaskLoader, UserLoader):
     """
 
     short_name = 'improved_imoj'
-    description = 'Improved ImoJudge format'
+    description = 'Improved Imoj format'
 
     @staticmethod
     def detect(path):
-        """See docstring in class Loader."""
-        as_contest = os.path.exists(path) and path.endswith('.yaml')
-        as_task = os.path.exists(os.path.join(path, 'cms', 'task-iif.yaml'))
+
+        as_contest = exists(path) and path.endswith('.yaml')
+        as_task = exists(os.path.join(path, 'cms', 'task-iif.yaml'))
         orig_path = os.path.normpath(os.path.join(path, '..'))
-        as_user = os.path.exists(orig_path) and orig_path.endswith('.yaml')
+        as_user = exists(orig_path) and orig_path.endswith('.yaml')
         return as_contest or as_task or as_user
 
+    @staticmethod
+    def find_task_name(task_path):
+
+        conf_path = os.path.join(task_path, 'cms', 'task-iif.yaml')
+        if not os.path.exists(conf_path):
+            return None
+        conf = load_yaml(conf_path)
+        return conf.get('name')
+
+    def contest_has_changed(self):
+        return True
+
+    def user_has_changed(self):
+        return True
+
+    def task_has_changed(self):
+        return True
+
     def get_task_loader(self, taskname):
-        """See docstring in class Loader."""
 
         conf_path = self.path
         base_path = os.path.dirname(self.path)
 
-        if not os.path.exists(conf_path):
-            logger.critical("specified contest config file not found")
+        if not exists(conf_path):
+            logger.critical("cannot find contest config file")
             return None
 
         conf = load_yaml(conf_path)
-        targets = []
+        candidates = []
 
         for t in conf['tasks']:
-            taskdir = os.path.join(base_path, t)
-            task_conf_path = os.path.join(taskdir, 'cms', 'task-iif.yaml')
-            if not os.path.exists(task_conf_path):
-                continue
-            task_conf = load_yaml(task_conf_path)
-            if ('name' in task_conf) and (task_conf['name'] == taskname):
-                targets.append(taskdir)
+            task_path = os.path.join(base_path, t)
+            name = ImprovedImojLoader.find_task_name(task_path)
+            if name == taskname:
+                candidates.append(task_path)
 
-        if len(targets) == 0:
-            logger.critical("The specified task cannot be found.")
+        if len(candidates) == 0:
+            logger.critical("cannot find specified task")
             return None
-        if len(targets) > 1:
-            logger.critical("There are multiple tasks with the same task name.")
+        if len(candidates) > 1:
+            logger.critical("multiple tasks found with the same task name")
             return None
 
-        taskdir = os.path.join(base_path, targets[0])
-
-        # TODO: check whether taskdir is a direct child of the contest dir
-
-        return self.__class__(taskdir, self.file_cacher)
+        return self.__class__(candidates[0], self.file_cacher)
 
     def get_contest(self):
-        """See docstring in class ContestLoader."""
 
         conf_path = self.path
         base_path = os.path.dirname(self.path)
 
-        if not os.path.exists(conf_path):
-            logger.critical("specified contest config file not found")
-            return None
+        if not exists(conf_path):
+            logger.critical("cannot find contest config file")
+            return None, None, None
 
         conf = load_yaml(conf_path)
         name = conf['name']
 
-        logger.info("Loading parameters for contest \"%s\".", name)
+        logger.info("loading parameters for contest \"%s\"", name)
 
-        args = {}
+        # default values
+        conf.setdefault('allow_user_tests', False)
+        conf.setdefault('allow_questions', False)
+        conf.setdefault('timezone', 'Asia/Tokyo')
 
-        assign(args, conf, 'name')
-        assign(args, conf, 'description')
-        assign(args, conf, 'languages')
-        try_assign(args, conf, 'start', make_datetime)
-        try_assign(args, conf, 'stop', make_datetime)
+        # override
+        conf['token_mode'] = TOKEN_MODE_DISABLED
 
-        try_assign(args, conf, 'ip_autologin')
-        try_assign(args, conf, 'ip_restriction')
+        # validity check
+        cms_langs = [lang.name for lang in LANGUAGES]
+        for lang in conf['languages']:
+            if lang not in cms_langs:
+                logger.critical("language \"%s\" is not supported", lang)
+                return None, None, None
 
-        try_assign(args, conf, 'score_precision')
-        try_assign(args, conf, 'max_submission_number')
-        try_assign(args, conf, 'max_user_test_number')
-        try_assign(args, conf, 'min_submission_interval', make_timedelta)
-        try_assign(args, conf, 'min_user_test_interval', make_timedelta)
+        contest = {}
 
-        if 'token_mode' not in conf:
-            conf['token_mode'] = 'disabled'
+        assign(contest, conf, 'name')
+        assign(contest, conf, 'description')
+        assign(contest, conf, 'languages')
 
-        assign(args, conf, 'token_mode')
-        try_assign(args, conf, 'token_max_number')
-        try_assign(args, conf, 'token_min_interval', make_timedelta)
-        try_assign(args, conf, 'token_gen_initial')
-        try_assign(args, conf, 'token_gen_number')
-        try_assign(args, conf, 'token_gen_interval', make_timedelta)
-        try_assign(args, conf, 'token_gen_max')
+        assign(contest, conf, 'allow_user_tests')
+        assign(contest, conf, 'allow_questions')
+        assign(contest, conf, 'timezone')
+        assign(contest, conf, 'token_mode')
 
-        if 'timezone' not in conf:
-            conf['timezone'] = 'Asia/Tokyo'
-        assign(args, conf, 'timezone')
-
-        if 'allow_user_tests' not in conf:
-            conf['allow_user_tests'] = False
-        assign(args, conf, 'allow_user_tests')
-        if 'allow_questions' not in conf:
-            conf['allow_questions'] = False
-        assign(args, conf, 'allow_questions')
+        try_assign(contest, conf, 'ip_restriction')
+        try_assign(contest, conf, 'ip_autologin')
+        try_assign(contest, conf, 'score_precision')
+        try_assign(contest, conf, 'max_submission_number')
+        try_assign(contest, conf, 'max_user_test_number')
+        try_assign(contest, conf, 'analysis_enabled')
+        try_assign(contest, conf, 'min_submission_interval', make_timedelta)
+        try_assign(contest, conf, 'min_user_test_interval', make_timedelta)
+        try_assign(contest, conf, 'start', make_datetime)
+        try_assign(contest, conf, 'stop', make_datetime)
+        try_assign(contest, conf, 'analysis_start', make_datetime)
+        try_assign(contest, conf, 'analysis_stop', make_datetime)
 
         participations = []
 
         for u in conf['users']:
-            participation_args = {}
-            assign(participation_args, u, 'username')
-            try_assign(participation_args, u, 'team')
-            try_assign(participation_args, u, 'hidden')
-            try_assign(participation_args, u, 'ip')
-            try_assign(participation_args, u, 'password', build_password)
-            participations.append(participation_args)
+            p = {}
+            assign(p, u, 'username')
+            try_assign(p, u, 'team')
+            try_assign(p, u, 'hidden')
+            try_assign(p, u, 'ip')
+            try_assign(p, u, 'password', build_password)
+            participations.append(p)
 
         tasks = []
 
         for t in conf['tasks']:
-            taskdir = os.path.join(base_path, t)
-            task_conf_path = os.path.join(taskdir, 'cms', 'task-iif.yaml')
-            if not os.path.exists(task_conf_path):
-                logger.warning("Task config file cannot be found "
-                    "(path: %s).", task_conf_path)
-                continue
-            task_conf = load_yaml(task_conf_path)
-            if not 'name' in task_conf:
-                logger.warning("Task name cannot be found in config file "
-                    "(path: %s).", task_conf_path)
-                continue
-            tasks.append(task_conf['name'])
+            task_path = os.path.join(base_path, t)
+            task_name = ImprovedImojLoader.find_task_name(task_path)
+            if task_name is not None:
+                tasks.append(task_name)
+            else:
+                logger.warning("cannot detect task name (path: \"%s\")", task_path)
 
-        all_languages = [l.name for l in LANGUAGES]
-        for l in args['languages']:
-            if l not in all_languages:
-                logger.critical("Language \"%s\" is not supported.", l)
-                return None
+        logger.info("contest parameters loaded")
 
-        logger.info("Contest parameters loaded.")
-
-        return Contest(**args), tasks, participations
+        return Contest(**contest), tasks, participations
 
     def get_user(self):
-        """See docstring in class UserLoader."""
 
         # due to the terrible AddUser script
         conf_path = os.path.dirname(self.path)
         username = os.path.basename(self.path)
 
-        if not os.path.exists(conf_path):
-            logger.critical("specified config file not found")
+        if not exists(conf_path):
+            logger.critical("cannot find user config file")
             return None
+
+        logger.info("loading parameters for user \"%s\"", username)
 
         conf = load_yaml(conf_path)
+        candidates = [u for u in conf['users'] if u['username'] == username]
 
-        logger.info("Loading parameters for user %s.", username)
-
-        targets = [u for u in conf['users'] if u['username'] == username]
-
-        if len(targets) == 0:
-            logger.critical("The specified user cannot be found.")
+        if len(candidates) == 0:
+            logger.critical("cannot find specified user")
             return None
-        if len(targets) > 1:
-            logger.critical("There are multiple users with the same user name.")
+        if len(candidates) > 1:
+            logger.critical("multiple users found with the same name")
             return None
 
-        args = {}
-        user_conf = targets[0]
+        user_conf = candidates[0]
 
-        if 'first_name' not in user_conf:
-            user_conf['first_name'] = ""
-        if 'last_name' not in user_conf:
-            user_conf['last_name'] = user_conf['username']
+        # default values
+        user_conf.setdefault('first_name', '')
+        user_conf.setdefault('last_name', username)
 
-        assign(args, user_conf, 'username')
-        assign(args, user_conf, 'password', build_password)
-        assign(args, user_conf, 'first_name')
-        assign(args, user_conf, 'last_name')
-        try_assign(args, user_conf, 'hidden')
+        user = {}
 
-        logger.info("User parameters loaded.")
+        assign(user, user_conf, 'username')
+        assign(user, user_conf, 'first_name')
+        assign(user, user_conf, 'last_name')
+        assign(user, user_conf, 'password', build_password)
 
-        return User(**args)
+        logger.info("user parameters loaded")
+
+        return User(**user)
 
     def get_task(self, get_statement=True):
-        """See docstring in class TaskLoader."""
 
         base_path = self.path
-        contest_path = os.path.join(self.path, '..')
-        conf_path = os.path.join(self.path, 'cms', 'task-iif.yaml')
-        contest_conf_path = os.path.join(contest_path, 'default-task-iif.yaml')
+        cms_path = os.path.join(base_path, 'cms')
+        conf_path = os.path.join(base_path, 'cms', 'task-iif.yaml')
 
-        if not os.path.exists(conf_path):
-            logger.critical("File missing: \"task-iif.yaml\"")
-            return None
-        if not os.path.exists(contest_conf_path):
-            logger.critical("File missing: \"default-task-iif.yaml\"")
+        if not exists(conf_path):
+            logger.critical("cannot find \"task-iif.yaml\"")
             return None
 
         conf = load_yaml(conf_path)
-        contest_conf = load_yaml(contest_conf_path)
-
         name = conf['name']
-        allowed_langs = contest_conf['languages']
 
-        logger.info("Loading parameters for task %s.", name)
+        logger.info("loading parameters for task \"%s\"", name)
 
-        default_keys = ['min_submission_interval', 'max_submission_number']
-        for key in default_keys:
-            parent_key = 'default_' + key
-            if parent_key in contest_conf:
-                conf.setdefault(key, contest_conf[parent_key])
+        # default
+        conf.setdefault('score_mode', SCORE_MODE_MAX_SUBTASK)
+        conf.setdefault('primary_language', 'ja')
+        conf.setdefault('samples', ['sample-*'])
+        conf.setdefault('feedback', ['*'])
+        conf.setdefault('version', 'default-dataset')
 
-        task_args = {}
+        # override
+        conf['token_mode'] = TOKEN_MODE_DISABLED
 
-        task_args['name'] = name
-        assign(task_args, conf, 'title')
+        # inherited default
+        default_conf_path = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH, DEFAULT_CONF_PATH)
+        if exists(default_conf_path):
+            default_conf = load_yaml(default_conf_path)
+            default_assign(conf, default_conf, 'primary_lang')
+            default_assign(conf, default_conf, 'max_submission_number')
+            default_assign(conf, default_conf, 'min_submission_interval')
+        else:
+            logging.warning("cannot find default config file")
 
-        if task_args['name'] == task_args['title']:
-            logger.warning("Short name and title are same. Please check.")
+        task = {}
+        task_type = conf.get('task_type', 'batch').lower()
+        score_type = conf.get('score_type', 'normal').lower()
 
-        try_assign(task_args, conf, 'score_precision')
-        try_assign(task_args, conf, 'max_submission_number')
-        try_assign(task_args, conf, 'max_user_test_number')
-        try_assign(task_args, conf, 'min_submission_interval', make_timedelta)
-        try_assign(task_args, conf, 'min_user_test_interval', make_timedelta)
+        # general task config
+        assign(task, conf, 'name')
+        assign(task, conf, 'title')
+        task['primary_statements'] = [conf['primary_language']]
+        assign(task, conf, 'score_mode')
+        assign(task, conf, 'token_mode')
+        try_assign(task, conf, 'max_submission_number')
+        try_assign(task, conf, 'max_user_test_number')
+        try_assign(task, conf, 'min_submission_interval', make_timedelta)
+        try_assign(task, conf, 'min_user_test_interval', make_timedelta)
+        try_assign(task, conf, 'score_precision')
 
-        if 'token_mode' not in conf:
-            conf['token_mode'] = 'disabled'
+        sample_regexp = globlist_to_regexp(conf['samples'])
+        feedback_regexp = globlist_to_regexp(conf['feedback'])
 
-        assign(task_args, conf, 'token_mode')
-        try_assign(task_args, conf, 'token_max_number')
-        try_assign(task_args, conf, 'token_min_interval', make_timedelta)
-        try_assign(task_args, conf, 'token_gen_initial')
-        try_assign(task_args, conf, 'token_gen_number')
-        try_assign(task_args, conf, 'token_gen_interval', make_timedelta)
-        try_assign(task_args, conf, 'token_gen_max')
+        # testcases detection
+        testcases = {}
+        missing_out_testcases = []
 
-        if 'score_mode' not in conf:
-            conf['score_mode'] = SCORE_MODE_MAX
-        assign(task_args, conf, 'score_mode')
+        old_input_dir = os.path.join(base_path, 'in')
+        new_input_dir = os.path.join(base_path, 'gen', 'in')
 
-        # Language Check
-        for lang_name in allowed_langs:
-            try:
-                lang = get_language(lang_name)
-            except KeyError:
-                logger.critical("Language \"%s\" is not supported.", lang_name)
+        for input_dir in [old_input_dir, new_input_dir]:
+
+            if not os.path.isdir(input_dir):
+                continue
+
+            for fname in os.listdir(input_dir):
+
+                m = re.match(r'\A(.+)\.txt\Z', fname)
+
+                if not m:
+                    logger.warning("ignored input file: \"%s\"", fname)
+                    continue
+
+                codename = m.group(1)
+                in_path = os.path.join(input_dir, fname)
+                out_path = os.path.join(input_dir, '..', 'out', fname)
+
+                if not exists(out_path):
+                    missing_out_testcases.append(codename)
+                    out_path = None
+
+                if codename in testcases:
+                    logger.warning("duplicated testcase name: \"%s\"", codename)
+
+                testcases[codename] = {
+                    'in_path': in_path,
+                    'out_path': out_path,
+                    'sample': sample_regexp.match(codename) is not None,
+                    'feedback': feedback_regexp.match(codename) is not None,
+                }
+
+        # additional files detection
+        headers = []
+        stubs, graders, manager, checker = [], [], None, None
+        manager_src, checker_src = None, None
+
+        for fname in os.listdir(cms_path):
+
+            path = os.path.join(cms_path, fname)
+
+            if any(fname.endswith(ext) for ext in HEADER_EXTS):
+                headers.append((fname, path))
+
+            for src_ext in SOURCE_EXTS:
+                if fname == ('stub%s' % src_ext):
+                    stubs.append((fname, path))
+                if fname == ('grader%s' % src_ext):
+                    graders.append((fname, path))
+
+            if fname == 'manager.cpp':
+                manager_src = path
+            if fname == 'checker.cpp':
+                checker_src = path
+
+        # auto compilation
+        if manager_src:
+            manager = ('manager', os.path.join(cms_path, 'manager'))
+            logger.info("manager auto compilation")
+            ret = subprocess.call(AUTO_COMPILATION_CMD + [manager_src, '-o', manager[1]])
+            if ret != 0:
+                logger.critical("manager compilation failed")
+                return None
+        if checker_src:
+            checker = ('checker', os.path.join(cms_path, 'checker'))
+            logger.info("checker auto compilation")
+            ret = subprocess.call(AUTO_COMPILATION_CMD + [checker_src, '-o', checker[1]])
+            if ret != 0:
+                logger.critical("checker compilation failed")
                 return None
 
-        # Statements
+        # statements detection & registration
         if get_statement:
 
-            primary_lang = conf.get('primary_language', 'ja')
+            statements = {}
+
+            primary_language = conf['primary_language']
             pdf_dir = os.path.join(base_path, 'task')
-            pdf_paths = [
-                (os.path.join(pdf_dir, "statement.pdf"), primary_lang),
-                (os.path.join(pdf_dir, "statement-ja.pdf"), 'ja'),
-                (os.path.join(pdf_dir, "statement-en.pdf"), 'en')]
+            pdf_files = [
+                ('statement.pdf', primary_language),
+                ('statement-ja.pdf', 'ja'),
+                ('statement-en.pdf', 'en'),
+            ]
 
-            task_args['statements'] = {}
-            for path, lang in pdf_paths:
-                if os.path.exists(path):
+            for fname, lang in pdf_files:
+                path = os.path.join(pdf_dir, fname)
+                if exists(path):
                     digest = self.file_cacher.put_file_from_path(path,
-                        "Statement for task %s (lang: %s)" % (name, lang))
-                    task_args['statements'][lang] = Statement(lang, digest)
+                        "statement (%s) for task \"%s\"" % (lang, name))
+                    statements[lang] = Statement(lang, digest)
 
-            if len(task_args['statements']) == 0:
-                logger.warning("Couldn't find any task statement.")
+            task['statements'] = statements
 
-            task_args['primary_statements'] = [primary_lang]
+            if len(statements) == 0:
+                logger.warning("cannot find any task statements")
 
-        # maybe modified in the succeeding process
-        task_args['submission_format'] = [
-            "%s.%%l" % name]
-
-        task = Task(**task_args)
-
-        ds_args = {}
-
-        ds_args['task'] = task
-        ds_args['description'] = conf.get('version', 'default-version')
-        ds_args['autojudge'] = False
-
-        testcases = []
-        input_digests = {}
-
-        feedback_globs = conf.get('feedback', ['*'])
-        feedback_regexp = convert_globlist_to_regexp(feedback_globs)
-        feedback_re = re.compile(feedback_regexp)
-
-        # Testcases enumeration
-        for input_dir_name in [os.path.join(base_path, 'gen', 'in'), os.path.join(base_path, 'in')]:
-            if not os.path.isdir(input_dir_name):
-                continue
-            for f in os.listdir(input_dir_name):
-                m = re.match(r'\A(.*)\.txt\Z', f)
-                if m:
-                    tc_name = m.group(1)
-                    in_path = os.path.join(input_dir_name, f)
-                    out_path = os.path.join(input_dir_name, '..', 'out', f)
-                    testcases.append({
-                        'name': tc_name,
-                        'in_path': in_path,
-                        'out_path': out_path,
-                        'feedback': feedback_re.match(tc_name) is not None
-                    })
-                else:
-                    logger.warning("File \"%s\" was not added to testcases" % f)
-
-        testcases.sort(key=lambda tc: tc['name'])
-
-        # FIXME: detect testcase name collision
-
-        ds_args['testcases'] = {}
-
-        null_output_testcases = []
-
-        for tc in testcases:
-
-            in_path = tc['in_path']
-            out_path = tc['out_path']
-            tc_name = tc['name']
-            feedback = tc['feedback']
-
-            input_digest = self.file_cacher.put_file_from_path(
-                in_path, "Input %s for task %s" % (tc_name, name))
-            output_digest = None
-
-            if os.path.exists(out_path):
-                output_digest = self.file_cacher.put_file_from_path(
-                    out_path, "Output %s for task %s" % (tc_name, name))
-            else:
-                null_output_testcases.append(tc_name)
-                dummy = StringIO('')
-                output_digest = self.file_cacher.put_file_from_fobj(
-                    dummy, "Dummy output %s for task %s" % (tc_name, name))
-                dummy.close()
-
-            ds_args['testcases'][tc_name] = Testcase(tc_name, feedback,
-                input_digest, output_digest)
-            input_digests[tc_name] = input_digest
-
-        if null_output_testcases:
-            pretty_testcases = ", ".join(null_output_testcases)
-            logger.warning("Some output files are missing.")
-            logger.warning("Testcases: %s", pretty_testcases)
-
-        # Attachments
+        # attachments detection
         dist_path = os.path.join(base_path, 'dist')
 
-        zip_dist_files = []
-        direct_dist_files = []
+        zipping_files = []
+        dist_files = []
 
-        if os.path.exists(dist_path):
-
+        if exists(dist_path):
             for base, dirs, files in os.walk(dist_path):
                 for fname in files:
-                    fpath = os.path.join(base, fname)
-                    arc_name = os.path.relpath(fpath, dist_path)
+
+                    path = os.path.join(base, fname)
+                    arc_name = os.path.relpath(path, dist_path)
+                    safe_arc_name = arc_name.replace(os.sep, '-')
+
                     if fname.endswith('.zip'):
-                        replaced_arc_name = arc_name.replace(os.sep, '-')
-                        direct_dist_files.append((fpath, replaced_arc_name))
+                        dist_files.append((path, safe_arc_name))
                     else:
-                        zip_dist_files.append((fpath, arc_name))
+                        zipping_files.append((path, arc_name))
 
-        # Auto copy of sample input/output files
-        samples_globs = conf.get('samples', ['sample-*'])
-        samples_regexp = convert_globlist_to_regexp(samples_globs)
-        samples_re = re.compile(samples_regexp)
+        for codename, testcase in testcases.items():
 
-        for tc in testcases:
+            in_path = testcase['in_path']
+            out_path = testcase['out_path']
 
-            in_path = tc['in_path']
-            out_path = tc['out_path']
-            tc_name = tc['name']
-            feedback = tc['feedback']
+            if testcase['sample']:
+                zipping_files.append((in_path, "%s-in.txt" % codename))
+                if out_path:
+                    zipping_files.append((out_path, "%s-out.txt" % codename))
+            elif task_type == 'outputonly':
+                zipping_files.append((in_path, "input_%s.txt" % codename))
 
-            if not samples_re.match(tc_name):
-                continue
-            zip_dist_files.append((in_path, tc_name + '-in.txt'))
-            if os.path.exists(out_path):
-                zip_dist_files.append((out_path, tc_name + '-out.txt'))
+        dataset = {}
 
-        zip_dist_file_names = map(lambda f: f[1], zip_dist_files)
-        direct_dist_file_names = map(lambda f: f[1], direct_dist_files)
-        logger.info("compressed dist files: %s", ", ".join(zip_dist_file_names))
-        logger.info("direct dist files: %s", ", ".join(direct_dist_file_names))
+        dataset['description'] = conf['version']
+        dataset['autojudge'] = False
 
-        if zip_dist_files:
-            zfn = tempfile.mkstemp('iif-loader-', '.zip')
-            with zipfile.ZipFile(zfn[1], 'w', zipfile.ZIP_STORED) as zf:
-                for fpath, fname in zip_dist_files:
-                    zf.write(fpath, os.path.join(name, fname))
-            zip_digest = self.file_cacher.put_file_from_path(
-                zfn[1], "Distribution archive for task %s" % name)
-            fname = name + '.zip'
-            task.attachments[fname] = Attachment(fname, zip_digest)
-            os.remove(zfn[1])
+        # score type parameters
+        if score_type == 'normal':
 
-        for fpath, fname in direct_dist_files:
-            digest = self.file_cacher.put_file_from_path(
-                fpath, "Distribution file for task %s" % name)
-            task.attachments[fname] = Attachment(fname, digest)
+            dataset['score_type_parameters'] = [
+                [st['point'], globlist_to_text(st['targets'])]
+                for st in conf['subtasks']
+            ]
+            dataset['score_type'] = 'GroupMin'
 
-        # Score type specific processing
-        scoretype = conf.get('score_type', 'Normal')
-
-        if scoretype == 'Normal':
-
-            score_params = [
-                [st['point'], convert_globlist_to_regexp(st['targets'])]
-                for st in conf['subtasks']]
-            ds_args['score_type_parameters'] = score_params
-            ds_args['score_type'] = 'GroupMin'
-
-        elif scoretype == 'Truncation':
+        elif score_type == 'truncation':
 
             score_params = []
 
             for st in conf['subtasks']:
 
-                option = st['score_option']
+                opt = st['score_option']
+                opt.setdefault('power', 1.0)
 
-                if 'threshold' not in option:
-                    logger.critical("\"Truncation\" score type requires "
-                        "\"threshold\" parameter for each task.")
+                if 'threshold' not in opt:
+                    logger.critical("truncation score type requires \"threshold\" parameter")
                     return None
-
-                if 'power' not in option:
-                    option['power'] = 1.0
 
                 param = [
                     st['point'],
-                    convert_globlist_to_regexp(st['targets']),
-                    option['threshold'][0],
-                    option['threshold'][1],
-                    option['power']
+                    globlist_to_text(st['targets']),
+                    opt['threshold'][0],
+                    opt['threshold'][1],
+                    opt['power'],
                 ]
 
                 score_params.append(param)
 
-            ds_args['score_type_parameters'] = score_params
-            ds_args['score_type'] = 'GroupMinTruncation'
+            dataset['score_type_parameters'] = score_params
+            dataset['score_type'] = 'GroupMinTruncation'
 
         else:
 
-            logger.critical("Score type \"%s\" is "
-                "currently unsupported.", scoretype)
+            logger.critical("unknown score type \"%s\"", score_type)
             return None
 
-        cms_path = os.path.join(base_path, 'cms')
+        # task_type
+        assign(dataset, conf, 'time_limit')
+        assign(dataset, conf, 'memory_limit')
 
-        grader_found = False
-        stub_found = False
-        manager_found = False
-        comparator_found = False
+        grader_param = 'grader' if graders else 'alone'
+        eval_param = 'comparator' if checker else 'diff'
 
-        ds_args["managers"] = {}
+        if task_type == 'batch':
 
-        # Auto generation for manager/checker
-        compilation_pairs = [
-            ['manager.cpp', 'manager'],
-            ['checker.cpp', 'checker']]
-        for src_name, dst_name in compilation_pairs:
-            src = os.path.join(cms_path, src_name)
-            dst = os.path.join(cms_path, dst_name)
-            if os.path.exists(src):
-                has_src_changed = True
-                if os.path.exists(dst):
-                    has_src_changed = get_mtime(src) > get_mtime(dst)
-                if has_src_changed:
-                    logger.info("Auto-generation for %s." % dst)
-                    os.system("g++ -std=c++11 -O2 -Wall -static %s -o %s"
-                              % (src, dst))
+            task['submission_format'] = ["%s.%%l" % name]
+            dataset['task_type'] = 'Batch'
+            dataset['task_type_parameters'] = \
+                [grader_param, ['', ''], eval_param]
 
-        # Additional headers
-        if os.path.exists(cms_path):
-            for fname in os.listdir(cms_path):
+        elif task_type == 'outputonly':
 
-                if any(fname.endswith(h) for h in HEADER_EXTS):
+            task['submission_format'] =  [
+                'output_%s.txt' % codename
+                for codename in testcases.keys()]
+            dataset['task_type'] = 'OutputOnly'
+            dataset['task_type_parameters'] = [eval_param]
 
-                    digest = self.file_cacher.put_file_from_path(
-                        os.path.join(cms_path, fname),
-                        "Header \"%s\" for task %s" % (fname, name))
-                    ds_args['managers'][fname] = Manager(fname, digest)
-                    logger.info("Storing additional header \"%s\".", fname)
+        elif task_type == 'communication':
 
-        # Graders and Stubs
-        for lang_name in allowed_langs:
-
-            lang = get_language(lang_name)
-            src_ext = lang.source_extension
-            if src_ext is None:
-                logger.warning("Source exts not found for language \"%s\"", lang_name)
-                continue
-
-            # Grader
-            grader_fname = 'grader%s' % src_ext
-            grader_path = os.path.join(cms_path, grader_fname)
-            if os.path.exists(grader_path):
-                grader_found = True
-                digest = self.file_cacher.put_file_from_path(
-                    grader_path,
-                    "Grader for task %s (language: %s)" % (name, lang_name))
-                ds_args['managers'][grader_fname] = Manager(grader_fname, digest)
-
-            # Stub
-            stub_fname = 'stub%s' % src_ext
-            stub_path = os.path.join(cms_path, stub_fname)
-            if os.path.exists(stub_path):
-                stub_found = True
-                digest = self.file_cacher.put_file_from_path(
-                    stub_path,
-                    "Stub for task %s (language: %s)" % (name, lang_name))
-                ds_args['managers'][stub_fname] = Manager(stub_fname, digest)
-
-        # Graders and Stubs Check
-        for lang_name in allowed_langs:
-
-            lang = get_language(lang_name)
-            src_ext = lang.source_extension
-            if src_ext is None:
-                continue
-
-            grader_fname = 'grader%s' % src_ext
-            grader_path = os.path.join(cms_path, grader_fname)
-            if grader_found and not os.path.exists(grader_path):
-                logger.warning("Grader for language \"%s\" not found.", lang_name)
-
-            stub_fname = 'stub%s' % src_ext
-            stub_path = os.path.join(cms_path, stub_fname)
-            if stub_found and not os.path.exists(stub_path):
-                logger.warning("Stub for language \"%s\" not found.", lang_name)
-
-        # Manager
-        if os.path.exists(os.path.join(cms_path, 'manager')):
-            manager_found = True
-            digest = self.file_cacher.put_file_from_path(
-                os.path.join(cms_path, 'manager'),
-                "Manager for task %s" % name)
-            ds_args['managers']['manager'] = Manager('manager', digest)
-
-        # Checker
-        if os.path.exists(os.path.join(cms_path, 'checker')):
-            comparator_found = True
-            digest = self.file_cacher.put_file_from_path(
-                os.path.join(cms_path, 'checker'),
-                "Checker for task %s" % name)
-            ds_args['managers']['checker'] = Manager('checker', digest)
-
-        eval_param = 'comparator' if comparator_found else 'diff'
-
-        # Task type specific processing
-        tasktype = conf.get('task_type', 'Batch')
-
-        if tasktype == 'Batch':
-
-            compilation_param = 'grader' if grader_found else 'alone'
-            infile_param = ''
-            outfile_param = ''
-
-            assign(ds_args, conf, 'time_limit', conv=float)
-            assign(ds_args, conf, 'memory_limit')
-
-            ds_args['task_type'] = 'Batch'
-            ds_args['task_type_parameters'] = \
-                [compilation_param, [infile_param, outfile_param], eval_param]
-
-        elif tasktype == 'OutputOnly':
-
-            task.submission_format = [
-                'output_%s.txt' % tc['name']
-                for tc in testcases]
-            for tc in testcases:
-                fname = 'input_%s.txt' % tc['name']
-                task.attachments[fname] = Attachment(fname, input_digests[tc['name']])
-
-            ds_args['task_type'] = 'OutputOnly'
-            ds_args['task_type_parameters'] = [eval_param]
-
-        elif tasktype == 'Communication':
-
-            if not stub_found:
-                logger.critical("Stub is required for Communication task.")
+            if not stubs:
+                logger.critical("stub is required for communication task")
                 return None
-            if not manager_found:
-                logger.critical("Manager is required for Communication task.")
+            if not manager:
+                logger.critical("manager is required for communication task")
                 return None
-
-            assign(ds_args, conf, 'time_limit', conv=float)
-            assign(ds_args, conf, 'memory_limit')
-
-            ds_args['task_type'] = 'Communication'
 
             task_params = [1]
 
             if 'task_option' in conf:
 
-                task_option = conf['task_option']
+                opt = conf['task_option']
 
-                if 'processes' not in task_option:
-                    logger.critical("task_option/processes is required.")
+                if 'processes' not in opt:
+                    logger.critical("task_option/processes is required")
                     return None
-                if 'formats' not in task_option:
-                    logger.critical("task_option/formats is required.")
+                if 'formats' not in opt:
+                    logger.critical("task_option/formats is required")
                     return None
 
-                task_params = [task_option['processes']]
-                task.submission_format = [
-                    filename
-                    for filename in task_option['formats']]
+                task_params = [opt['processes']]
+                task['submission_format'] = [
+                    fname for fname in opt['formats']
+                ]
 
-            ds_args['task_type_parameters'] = task_params
+            dataset['task_type'] = 'Communication'
+            dataset['task_type_parameters'] = task_params
 
         else:
-            logger.critical("Task type \"%s\" is "
-                "currently unsupported.", tasktype)
+
+            logger.critical("unknown task type \"%s\"", task_type)
             return None
 
-        dataset = Dataset(**ds_args)
-        task.active_dataset = dataset
+        # attachments registration
+        attachments = {}
 
-        logger.info("tasktype: %s", tasktype)
-        def pr(b):
-            return "found" if b else "-----"
-        logger.info("grader: %s, comparator: %s", pr(grader_found), pr(comparator_found))
-        logger.info("stub  : %s, manager   : %s", pr(stub_found), pr(manager_found))
+        for path, arc_name in dist_files:
+            digest = self.file_cacher.put_file_from_path(
+                path, "distribution file for task \"%s\"" % name)
+            attachments[arc_name] = Attachment(arc_name, digest)
 
-        logger.info("Task parameters loaded.")
+        # zipfile registration
+        if zipping_files:
 
-        return task
+            zip_archive = tempfile.mkstemp('cms-iimoj-loader-', '.zip')
+            zip_path = zip_archive[1]
 
-    def contest_has_changed(self):
-        """See docstring in class ContestLoader."""
-        return True
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as fp:
+                for path, arc_name in zipping_files:
+                    new_arc_name = os.path.join(name, arc_name)
+                    fp.write(path, new_arc_name)
 
-    def user_has_changed(self):
-        """See docstring in class UserLoader."""
-        return True
+            zip_digest = self.file_cacher.put_file_from_path(zip_path,
+                "distribution archive for task \"%s\"" % name)
+            zip_fname = name + '.zip'
+            attachments[zip_fname] = Attachment(zip_fname, zip_digest)
+            os.remove(zip_path)
 
-    def task_has_changed(self):
-        """See docstring in class TaskLoader."""
-        return True
+        task['attachments'] = attachments
+
+        # additional files registration
+        extra_managers = {}
+
+        extra_files = headers + stubs + graders
+        if manager:
+            extra_files.append(manager)
+        if checker:
+            extra_files.append(checker)
+
+        for fname, path in extra_files:
+            digest = self.file_cacher.put_file_from_path(path,
+                    "extra file \"%s\" for task \"%s\"" % (fname, name))
+            logger.info("extra file: \"%s\"", fname)
+            extra_managers[fname] = Manager(fname, digest)
+
+        dataset['managers'] = extra_managers
+
+        # testcases registration
+        logger.info("registering testcases")
+
+        registered_testcases = {}
+
+        for codename, testcase in testcases.items():
+
+            in_path = testcase['in_path']
+            out_path = testcase['out_path']
+            feedback = testcase['feedback']
+
+            in_digest = self.file_cacher.put_file_from_path(in_path,
+                "input \"%s\" for task \"%s\"" % (codename, name))
+            out_digest = None
+
+            if out_path:
+                out_digest = self.file_cacher.put_file_from_path(out_path,
+                    "output \"%s\" for task \"%s\"" % (codename, name))
+            else:
+                out_digest = self.file_cacher.put_file_content(b'',
+                    "output \"%s\" for task \"%s\"" % (codename, name))
+
+            registered_testcases[codename] = Testcase(codename,
+                feedback, in_digest, out_digest)
+
+        logger.info("testcases registration completed")
+
+        dataset['testcases'] = registered_testcases
+
+        # instantiation
+        db_task = Task(**task)
+        dataset['task'] = db_task
+        db_dataset = Dataset(**dataset)
+        db_task.active_dataset = db_dataset
+
+        # import result
+        logger.info("========== task \"%s\" ==========", name)
+        logger.info("tasktype  : %s", task_type)
+
+        if task_type != 'batch':
+            logger.info("headers   : [%02d files]", len(headers))
+            for fname, _ in sorted(headers):
+                logger.info("            * %s", fname)
+
+        if task_type == 'communication':
+            logger.info("manager   : %s", "OK" if manager else "--")
+            logger.info("stub      : [%02d files]", len(stubs))
+            for fname, _ in sorted(stubs):
+                logger.info("            * %s", fname)
+
+        if task_type != 'communication':
+            logger.info("comparator: %s", "OK" if checker else "--")
+
+        if task_type == 'batch':
+            logger.info("grader    : [%02d files]", len(graders))
+            for fname, _ in sorted(graders):
+                logger.info("            * %s", fname)
+
+        logger.info("zipped    : [%02d files]", len(zipping_files))
+        for _, arc_name in sorted(zipping_files):
+            logger.info("            * %s", arc_name)
+        logger.info("direct    : [%02d files]", len(dist_files))
+        for _, arc_name in sorted(dist_files):
+            logger.info("            * %s", arc_name)
+
+        if missing_out_testcases and task_type != 'communication':
+            pretty = ", ".join(sorted(missing_out_testcases)[:4])
+            remain = len(missing_out_testcases) - 4
+            if remain > 0:
+                pretty += (", (%d more files)" % remain)
+            logger.warning("missing output: %s", pretty)
+
+        logger.info("=================%s============", "=" * len(name))
+
+        logger.info("task parameters loaded")
+
+        return db_task
