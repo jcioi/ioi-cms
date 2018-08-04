@@ -93,6 +93,10 @@ class ContestImporter(object):
         # Get the contest. The loader should give a bare contest, putting tasks
         # and participations only in the other return values. We make sure.
         contest, tasks, participations = self.loader.get_contest()
+
+        if contest is None:
+            return False
+
         if contest.tasks != []:
             contest.tasks = []
             logger.warning("Contest loader should not fill tasks.")
@@ -196,6 +200,11 @@ class ContestImporter(object):
 
         """
         task_loader = self.loader.get_task_loader(taskname)
+
+        if task_loader is None:
+            raise ImportDataError(
+                "Could not import task \"%s\"." % taskname)
+
         task = session.query(Task).filter(Task.name == taskname).first()
 
         if task is None:
