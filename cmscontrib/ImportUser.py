@@ -64,10 +64,11 @@ class UserImporter(object):
 
     """
 
-    def __init__(self, path, contest_id, loader_class):
+    def __init__(self, path, contest_id, loader_class, update):
         self.file_cacher = FileCacher()
         self.contest_id = contest_id
         self.loader = loader_class(os.path.abspath(path), self.file_cacher)
+        self.update = update
 
     def do_import(self):
         """Get the user from the UserLoader and store it."""
@@ -82,7 +83,7 @@ class UserImporter(object):
         with SessionGen() as session:
             try:
                 contest = contest_from_db(self.contest_id, session)
-                user = self._user_to_db(session, user)
+                user = self._user_to_db(session, user, self.update)
             except ImportDataError as e:
                 logger.error(str(e))
                 logger.info("Error while importing, no changes were made.")
@@ -110,14 +111,15 @@ class UserImporter(object):
             importer = UserImporter(
                 path=user_path,
                 contest_id=self.contest_id,
-                loader_class=get_loader(user_path)
+                loader_class=get_loader(user_path),
+                update=self.update,
             )
             importer.do_import()
 
         return True
 
     @staticmethod
-    def _user_to_db(session, user):
+    def _user_to_db(session, user, update=False):
         """Add the user to the DB
 
         Return the user again, or raise in case a user with the same username
@@ -126,11 +128,18 @@ class UserImporter(object):
         """
         old_user = session.query(User)\
             .filter(User.username == user.username).first()
-        if old_user is not None:
+        if old_user is not None and update:
+            old_user.username = user.username
+            old_user.first_name = user.first_name
+            old_user.last_name = user.last_name
+            old_user.password = user.password
+            return old_user
+        elif old_user is not None:
             raise ImportDataError(
                 "User \"%s\" already exists." % user.username)
-        session.add(user)
-        return user
+        else:
+            session.add(user)
+            return user
 
 
 def main():
@@ -165,6 +174,11 @@ def main():
         action="store", type=int,
         help="id of the contest the users will be attached to"
     )
+    parser.add_argument(
+        "-u", "--update",
+        action="store_true",
+        help="update an existing team",
+    )
 
     args = parser.parse_args()
 
@@ -174,7 +188,8 @@ def main():
     importer = UserImporter(
         path=args.target,
         contest_id=args.contest_id,
-        loader_class=get_loader(args.target)
+        loader_class=get_loader(args.target),
+        update=args.update,
     )
 
     if args.all:

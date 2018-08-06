@@ -57,9 +57,10 @@ logger = logging.getLogger(__name__)
 class TeamImporter(object):
     """Script to create a team in the database."""
 
-    def __init__(self, path, loader_class):
+    def __init__(self, path, loader_class, update):
         self.file_cacher = FileCacher()
         self.loader = loader_class(os.path.realpath(path), self.file_cacher)
+        self.update = update
 
     def do_import(self):
         """Get the team from the TeamLoader and store it."""
@@ -72,7 +73,7 @@ class TeamImporter(object):
         logger.info("Creating team on the database.")
         with SessionGen() as session:
             try:
-                team = self._team_to_db(session, team)
+                team = self._team_to_db(session, team, self.update)
             except ImportDataError as e:
                 logger.error(str(e))
                 logger.info("Error while importing, no changes were made.")
@@ -100,19 +101,24 @@ class TeamImporter(object):
                     added.add(team_path)
                     importer = TeamImporter(
                         path=team_path,
-                        loader_class=get_loader(team_path)
+                        loader_class=get_loader(team_path),
+                        update=self.update,
                     )
                     importer.do_import()
 
         return True
 
     @staticmethod
-    def _team_to_db(session, team):
+    def _team_to_db(session, team, update=False):
         old_team = session.query(Team).filter(Team.code == team.code).first()
-        if old_team is not None:
+        if old_team is not None and update:
+            old_team.name = team.name
+            return old_team
+        elif old_team is not None:
             raise ImportDataError("Team \"%s\" already exists." % team.code)
-        session.add(team)
-        return team
+        else:
+            session.add(team)
+            return team
 
 
 def main():
@@ -143,6 +149,11 @@ def main():
         help="try to import the needed teams inside target (not "
              "necessarily all of them)"
     )
+    parser.add_argument(
+        "-u", "--update",
+        action="store_true",
+        help="update an existing team",
+    )
 
     args = parser.parse_args()
 
@@ -151,7 +162,8 @@ def main():
 
     importer = TeamImporter(
         path=args.target,
-        loader_class=get_loader(args.target)
+        loader_class=get_loader(args.target),
+        update=args.update,
     )
 
     if args.all:
