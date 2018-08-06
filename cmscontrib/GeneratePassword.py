@@ -52,10 +52,11 @@ def generate_passwords(contest_id, exclude_hidden, exclude_unrestricted, output_
     logger.info("Updating passwords...")
 
     with open(output_path, 'w') as io:
+        io.write("contest_id,team,fullname,username,password\n")
         with SessionGen() as session:
             if contest_id is not None:
                 contest = Contest.get_from_id(contest_id, session)
-                objects = session.query(Participation).join(User)
+                objects = session.query(Participation).join(Participation.user).join(Participation.team)
                 if exclude_unrestricted:
                     objects = objects.filter(Participation.unrestricted == False)
                 if exclude_hidden:
@@ -67,13 +68,15 @@ def generate_passwords(contest_id, exclude_hidden, exclude_unrestricted, output_
                 password = generate_random_password()
                 obj.password = build_password(password, 'plaintext')
 
-                username = obj.username if isinstance(obj, User) else obj.user.username
-                if contest_id is not None:
-                    logger.info("Updating user %s in contest id %d", username, contest.id)
-                    io.write("%s,%d,%s\n" % (username, contest.id, password))
+                user = obj if isinstance(obj, User) else obj.user
+                fullname = "%s %s" % (user.first_name, user.last_name)
+                if isinstance(obj, Participation):
+                    team = obj.team.code if obj.team is not None else ''
+                    logger.info("Updating participation of user %s (team=%s) on contest id %d", user.username, team, contest.id)
+                    io.write("%d,%s,%s,%s,%s\n" % (contest.id, team, fullname, user.username, password))
                 else:
-                    logger.info("Updating user %s", username)
-                    io.write("%s,%s\n" % (username, password))
+                    logger.info("Updating user %s", user.username)
+                    io.write(",,%s,%s,%s\n" % (fullname, user.username, password))
 
             session.commit()
 
