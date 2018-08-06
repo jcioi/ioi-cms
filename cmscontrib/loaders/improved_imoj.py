@@ -261,16 +261,6 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
         logger.info("loading parameters for task \"%s\"", name)
 
-        # default
-        conf.setdefault('score_mode', SCORE_MODE_MAX_SUBTASK)
-        conf.setdefault('primary_language', 'ja')
-        conf.setdefault('samples', ['sample-*'])
-        conf.setdefault('feedback', ['*'])
-        conf.setdefault('version', 'default-dataset')
-
-        # override
-        conf['token_mode'] = TOKEN_MODE_DISABLED
-
         # inherited default
         default_conf_path_x = os.path.join(base_path, DEFAULT_CONF_PATH)
         default_conf_path = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH, default_conf_path_x)
@@ -281,6 +271,16 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
             default_assign(conf, default_conf, 'min_submission_interval')
         else:
             logging.warning("cannot find default config file")
+
+        # default
+        conf.setdefault('score_mode', SCORE_MODE_MAX_SUBTASK)
+        conf.setdefault('primary_language', 'ja')
+        conf.setdefault('samples', ['sample-*'])
+        conf.setdefault('feedback', ['*'])
+        conf.setdefault('version', 'default-dataset')
+
+        # override
+        conf['token_mode'] = TOKEN_MODE_DISABLED
 
         task = {}
         task_type = conf.get('task_type', 'batch').lower()
