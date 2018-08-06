@@ -514,6 +514,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
                 return None
 
             task_params = [1]
+            submission_format = ["%s.%%l" % name]
 
             if 'task_option' in conf:
 
@@ -527,10 +528,11 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
                     return None
 
                 task_params = [opt['processes']]
-                task['submission_format'] = [
+                submission_format = [
                     fname for fname in opt['formats']
                 ]
 
+            task['submission_format'] = submission_format
             dataset['task_type'] = 'Communication'
             dataset['task_type_parameters'] = task_params
 
