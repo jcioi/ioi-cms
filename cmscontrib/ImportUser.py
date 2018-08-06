@@ -132,7 +132,6 @@ class UserImporter(object):
             old_user.username = user.username
             old_user.first_name = user.first_name
             old_user.last_name = user.last_name
-            old_user.password = user.password
             return old_user
         elif old_user is not None:
             raise ImportDataError(
