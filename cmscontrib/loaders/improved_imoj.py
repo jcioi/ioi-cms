@@ -13,7 +13,7 @@ from dateutil import parser, tz
 from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, TOKEN_MODE_DISABLED
 from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS, SOURCE_EXTS
 from cms.db import Contest, User, Task, Statement, Attachment, \
-    Dataset, Manager, Testcase
+    Dataset, Manager, Testcase, Team
 from cmscommon.crypto import build_password
 
 from .base_loader import ContestLoader, TaskLoader, UserLoader
@@ -80,9 +80,11 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
         as_contest = exists(path) and path.endswith('.yaml')
         as_task = exists(os.path.join(path, 'cms', 'task-iif.yaml'))
+
+        # ImportUser/Team forces to use base_path/$name
         orig_path = os.path.normpath(os.path.join(path, '..'))
-        as_user = exists(orig_path) and orig_path.endswith('.yaml')
-        return as_contest or as_task or as_user
+        as_user_or_team = exists(orig_path) and orig_path.endswith('.yaml')
+        return as_contest or as_task or as_user_or_team
 
     @staticmethod
     def find_task_name(task_path):
@@ -206,6 +208,37 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         logger.info("contest parameters loaded")
 
         return Contest(**contest), tasks, participations
+
+    def get_team(self):
+        # due to the terrible AddUser script
+        conf_path = os.path.dirname(self.path)
+        name = os.path.basename(self.path)
+
+        if not exists(conf_path):
+            logger.critical("cannot find config file")
+            return None
+
+        logger.info("loading parameters for team \"%s\"", name)
+
+        conf = load_yaml(conf_path)
+        candidates = [u for u in conf['teams'] if u['code'] == name]
+
+        if len(candidates) == 0:
+            logger.critical("cannot find specified team")
+            return None
+        if len(candidates) > 1:
+            logger.critical("multiple teams found with the same code")
+            return None
+
+        item = candidates[0]
+
+        # default values
+        team = {}
+
+        assign(team, item, 'code')
+        assign(team, item, 'name')
+
+        return Team(**item)
 
     def get_user(self):
 
