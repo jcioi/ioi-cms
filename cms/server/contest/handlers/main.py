@@ -40,9 +40,11 @@ import json
 import logging
 
 import tornado.web
+from sqlalchemy.orm import joinedload
 
 from cms import config
-from cms.db import PrintJob
+from cms.db import PrintJob, Contest
+from cms.grading import task_score
 from cms.grading.steps import COMPILATION_MESSAGES, EVALUATION_MESSAGES
 from cms.server import multi_contest
 from cms.server.contest.authentication import validate_login
@@ -181,6 +183,57 @@ class NotificationsHandler(ContestHandler):
 
         self.write(json.dumps(res))
 
+
+class StatsHandler(ContestHandler):
+    """Displays statistics.
+
+    """
+
+    refresh_cookie = False
+
+    @tornado.web.authenticated
+    @multi_contest
+    def get(self):
+
+        contest = self.sql_session.query(Contest)\
+            .filter(Contest.id == self.contest.id)\
+            .options(joinedload('participations'))\
+            .options(joinedload('participations.submissions'))\
+            .options(joinedload('participations.submissions.token'))\
+            .options(joinedload('participations.submissions.results'))\
+            .first()
+
+        raw_stats = []
+
+        for task in contest.tasks:
+
+            name = task.name
+            task_total = 0.0
+
+            for p in contest.participations:
+                if p.hidden:
+                    continue
+                t_score, task_partial = task_score(p, task)
+                t_score = round(t_score, task.score_precision)
+                task_total += t_score
+
+            raw_stats.append({'name': name, 'total': task_total})
+
+        contest_total = sum(stat['total'] for stat in raw_stats)
+        stat = None
+
+        if contest_total == 0:
+            stats = [
+                { 'name': stat['name'], 'ratio': 1.0 / len(contest.tasks) }
+                for stat in raw_stats
+            ]
+        else:
+            stats = [
+                { 'name': stat['name'], 'ratio': stat['total'] / contest_total }
+                for stat in raw_stats
+            ]
+
+        self.write(json.dumps({'tasks_by_score_rel': stats}))
 
 class PrintingHandler(ContestHandler):
     """Serve the interface to print and handle submitted print jobs.
