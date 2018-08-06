@@ -32,7 +32,7 @@ from future.builtins import *  # noqa
 
 import bcrypt
 import binascii
-import random
+from Crypto.Random import random
 
 from string import ascii_lowercase
 
@@ -160,7 +160,7 @@ def generate_random_password():
     return (str): a random string.
 
     """
-    return "".join((random.choice(ascii_lowercase) for _ in range(6)))
+    return "".join((random.choice('abcdefghjkmnpqrstuvwxyz23456789') for _ in range(10)))
 
 
 def parse_authentication(authentication):
