@@ -49,7 +49,8 @@ from .tasksubmission import \
     SubmissionStatusHandler, \
     SubmissionDetailsHandler, \
     SubmissionFileHandler, \
-    UseTokenHandler
+    UseTokenHandler, \
+    TaskScoreHandler
 from .taskusertest import \
     UserTestInterfaceHandler, \
     UserTestHandler, \
@@ -90,6 +91,7 @@ HANDLERS = [
     (r"/tasks/(.*)/submissions/([1-9][0-9]*)/files/(.*)",
      SubmissionFileHandler),
     (r"/tasks/(.*)/submissions/([1-9][0-9]*)/token", UseTokenHandler),
+    (r"/tasks/(.*)/score", TaskScoreHandler),
 
     # Task usertests
 
