@@ -14,6 +14,8 @@ phases:
       - cp appspec.yml /out/
       - cp -av . /out/src
       - cp -av /opt/cms_venv/ /out/venv
+      - mkdir -p /opt/src/ioi/flags
+      - aws s3 sync s3://ioi18-misc/flags /opt/src/ioi/flags
       - touch /out/venv/.built-on-codebuild
       
 artifacts:
