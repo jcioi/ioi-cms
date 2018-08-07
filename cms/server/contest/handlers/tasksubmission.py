@@ -40,6 +40,7 @@ from future.builtins import *  # noqa
 import logging
 import re
 
+import json
 import tornado.web
 
 from sqlalchemy.orm import joinedload
@@ -54,6 +55,8 @@ from cms.server.contest.tokening import \
     UnacceptableToken, TokenAlreadyPlayed, accept_token, tokens_available
 from cmscommon.crypto import encrypt_number
 from cmscommon.mimetypes import get_type_for_file_name
+from cms.db import Participation
+from cms.grading import task_score
 
 from ..phase_management import actual_phase_required
 
@@ -166,6 +169,34 @@ class TaskSubmissionsHandler(ContestHandler):
                     submissions_left=submissions_left,
                     submissions_download_allowed=download_allowed,
                     **self.r_params)
+
+
+class TaskScoreHandler(ContestHandler):
+
+    @tornado.web.authenticated
+    @actual_phase_required(0, 3)
+    @multi_contest
+    def get(self, task_name):
+
+        task = self.get_task(task_name)
+        if task is None:
+            raise tornado.web.HTTPError(404)
+
+        participation = self.get_current_user()
+        if participation is None:
+            raise tornado.web.HTTPError(404)
+
+        participation_joined = self.sql_session.query(Participation)\
+            .filter(Participation.id == participation.id)\
+            .options(joinedload("submissions"))\
+            .options(joinedload("submissions.token"))\
+            .options(joinedload("submissions.results"))\
+            .first()
+
+        score, partial = task_score(participation_joined, task)
+
+        self.write(json.dumps(score))
+
 
 
 class SubmissionStatusHandler(ContestHandler):
