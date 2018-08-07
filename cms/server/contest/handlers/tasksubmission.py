@@ -194,6 +194,7 @@ class TaskScoreHandler(ContestHandler):
             .first()
 
         score, partial = task_score(participation_joined, task)
+        score = round(score, task.score_precision)
 
         self.write(json.dumps(score))
 
