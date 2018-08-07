@@ -55,6 +55,7 @@ update_submission_row = function (submission_id, data) {
             row.children("td.total_score").removeClass("undefined");
             row.children("td.total_score").html(data["score_message"]);
         }
+        schedule_update_score();
     } else if (data["status"] != {{ SubmissionResult.COMPILATION_FAILED }}) {
         schedule_update_submission_row(submission_id);
     }
@@ -65,13 +66,24 @@ schedule_update_submission_row = function (submission_id) {
         $.get(utils.contest_url("tasks", "{{ task.name }}", "submissions", submission_id), function (data) {
             update_submission_row(submission_id, data);
         });
-    }, 10000);
+    }, 20000);
+};
+
+update_score = function(data) {
+    $("#current_score").text(data);
+}
+
+schedule_update_score = function () {
+    $.get(utils.contest_url("tasks", "{{ task.name }}", "score"), function (data) {
+        update_score(data);
+    });
 };
 
 $(document).ready(function () {
     $('#submission_list tbody tr[data-status][data-status!="{{ SubmissionResult.COMPILATION_FAILED }}"][data-status!="{{ SubmissionResult.SCORED }}"]').each(function (idx, elem) {
         schedule_update_submission_row($(this).attr("data-submission"));
     });
+    schedule_update_score();
 });
 
 {% endblock additional_js %}
@@ -99,6 +111,10 @@ $(document).ready(function () {
         </p>
     </div>
 {% endif %}
+
+    <div class="span5">
+        <p>{% trans %}Your current score for this task: {% endtrans %} <span id="current_score"></span></p>
+    </div>
 
 <div id="submit_solution" class="row">
     <div class="span5">
