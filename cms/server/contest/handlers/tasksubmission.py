@@ -40,7 +40,6 @@ from future.builtins import *  # noqa
 import logging
 import re
 
-import json
 import tornado.web
 
 from sqlalchemy.orm import joinedload
@@ -196,7 +195,8 @@ class TaskScoreHandler(ContestHandler):
         score, partial = task_score(participation_joined, task)
         score = round(score, task.score_precision)
 
-        self.write(json.dumps(score))
+        score_string = format(score, ".%df" % task.score_precision)
+        self.write(score_string)
 
 
 
