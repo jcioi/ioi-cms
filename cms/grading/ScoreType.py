@@ -247,7 +247,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             <thead>
                 <tr>
                     <th class="idx">
-                        {% trans %}#{% endtrans %}
+                        {% trans %}Case Number{% endtrans %}
                     </th>
                     <th class="outcome">
                         {% trans %}Outcome{% endtrans %}
