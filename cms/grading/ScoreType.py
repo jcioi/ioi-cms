@@ -266,9 +266,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 </tr>
             </thead>
             <tbody>
-    {% set ns = namespace(continue_feedback=true) %}
     {% for tc in st["testcases"] %}
-        {% if ns.continue_feedback and "outcome" in tc and "text" in tc %}
+        {% set display = tc["display"] or (feedback_level == FEEDBACK_LEVEL_FULL) %}
+        {% if display and "outcome" in tc and "text" in tc %}
             {% if tc["outcome"] == "Correct" %}
                 <tr class="correct">
             {% elif tc["outcome"] == "Not correct" %}
@@ -276,7 +276,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             {% else %}
                 <tr class="partiallycorrect">
             {% endif %}
-                    <td class="idx">{{ loop.index }}</td>
+                    <td class="idx">{{ tc["idx"] }}</td>
                     <td class="outcome">{{ _(tc["outcome"]) }}</td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}
@@ -297,20 +297,6 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 {% endif %}
                     </td>
             {% endif %}
-                </tr>
-            {% if tc["outcome"] != "Correct"
-                    and feedback_level != FEEDBACK_LEVEL_FULL %}
-                {% set ns.continue_feedback = false %}
-            {% endif %}
-        {% else %}
-                <tr class="undefined">
-            {% if feedback_level == FEEDBACK_LEVEL_FULL %}
-                    <td colspan="5">
-            {% else %}
-                    <td colspan="3">
-            {% endif %}
-                        {% trans %}N/A{% endtrans %}
-                    </td>
                 </tr>
         {% endif %}
     {% endfor %}
@@ -378,7 +364,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
         for st_idx, parameter in enumerate(self.parameters):
             target = targets[st_idx]
             score += parameter[0]
-            if all(self.public_testcases[tc_idx] for tc_idx in target):
+            if all(self.public_testcases[codename] for codename in target):
                 public_score += parameter[0]
             headers += ["Subtask %d (%g)" % (st_idx + 1, parameter[0])]
 
@@ -407,25 +393,53 @@ class ScoreTypeGroup(ScoreTypeAlone):
 
             testcases = []
             public_testcases = []
-            for tc_idx in target:
-                tc_outcome = self.get_public_outcome(
-                    float(evaluations[tc_idx].outcome), parameter)
+            min_idx = 0
 
-                testcases.append({
-                    "idx": tc_idx,
+            for tc_idx, codename in enumerate(target):
+
+                eval_value = float(evaluations[codename].outcome)
+                public = self.public_testcases[codename]
+
+                tc_outcome = self.get_public_outcome(
+                    eval_value, parameter)
+
+                full_data = {
+                    "idx": tc_idx + 1,
+                    "codename": codename,
+                    "display": True,
                     "outcome": tc_outcome,
-                    "text": evaluations[tc_idx].text,
-                    "time": evaluations[tc_idx].execution_time,
-                    "memory": evaluations[tc_idx].execution_memory})
-                if self.public_testcases[tc_idx]:
-                    public_testcases.append(testcases[-1])
+                    "text": evaluations[codename].text,
+                    "time": evaluations[codename].execution_time,
+                    "memory": evaluations[codename].execution_memory,
+                }
+
+                minimized_data = {
+                    "idx": tc_idx + 1,
+                    "codename": codename,
+                    "display": True,
+                }
+
+                testcases.append(full_data)
+                if public:
+                    public_testcases.append(full_data.copy())
                 else:
-                    public_testcases.append({"idx": tc_idx})
+                    public_testcases.append(minimized_data)
+
+                min_eval_value = float(evaluations[target[min_idx]].outcome)
+                if eval_value < min_eval_value:
+                    min_idx = tc_idx
 
             st_score_fraction = self.reduce(
-                [float(evaluations[tc_idx].outcome) for tc_idx in target],
+                [float(evaluations[codename].outcome) for codename in target],
                 parameter)
             st_score = st_score_fraction * parameter[0]
+
+            if st_score_fraction < 1.0:
+                for t in testcases:
+                    t["display"] = False
+                testcases[min_idx]["display"] = True
+
+            # FIXME: restriction of feedback for public_testcases
 
             score += st_score
             st_scores.append(st_score)
@@ -438,7 +452,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 "max_score": parameter[0],
                 "testcases": testcases})
 
-            if all(self.public_testcases[tc_idx] for tc_idx in target):
+            if all(self.public_testcases[codename] for codename in target):
                 public_score += st_score
                 public_st_scores.append(st_score)
                 public_subtasks.append(subtasks[-1])
