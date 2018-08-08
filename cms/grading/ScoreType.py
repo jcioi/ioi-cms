@@ -298,16 +298,6 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     </td>
             {% endif %}
                 </tr>
-        {% else %}
-                <tr class="undefined">
-                    <td class="idx">{{ tc["idx"] }}</td>
-                    <td class="outcome">{% trans %}N/A{% endtrans %}</td>
-                    <td class="details">{% trans %}N/A{% endtrans %}</td>
-            {% if feedback_level == FEEDBACK_LEVEL_FULL %}
-                    <td class="execution-time">{% trans %}N/A{% endtrans %}</td>
-                    <td class="memory-used">{% trans %}N/A{% endtrans %}</td>
-            {% endif %}
-                </tr>
         {% endif %}
     {% endfor %}
             </tbody>
