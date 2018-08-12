@@ -707,7 +707,7 @@ td.token_rules p:last-child {
 }
 
 #submission_detail table.testcase-list tbody tr.hidden-testcase td.idx {
-    background-color: #b0b0b0;
+    background-color: #e0e0e0;
 }
 
 /*** per-user time box */
