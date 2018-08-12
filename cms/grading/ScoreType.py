@@ -276,12 +276,14 @@ class ScoreTypeGroup(ScoreTypeAlone):
     {% for tc in st["testcases"] %}
         {% set display = tc["display"] or (feedback_level == FEEDBACK_LEVEL_FULL) %}
         {% if (display or analysis_mode) and "outcome" in tc and "text" in tc %}
+            {% set is_hidden = (not display) and analysis_mode %}
+            {% set hidden_class = " hidden-testcase" if is_hidden else "" %}
             {% if tc["outcome"] == "Correct" %}
-                <tr class="correct">
+                <tr class="correct{{ hidden_class }}">
             {% elif tc["outcome"] == "Not correct" %}
-                <tr class="notcorrect">
+                <tr class="notcorrect{{ hidden_class }}">
             {% else %}
-                <tr class="partiallycorrect">
+                <tr class="partiallycorrect{{ hidden_class }}">
             {% endif %}
                     <td class="idx">{{ tc["idx"] }}</td>
             {% if analysis_mode %}
