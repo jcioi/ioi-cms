@@ -426,7 +426,10 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     public_testcases.append(minimized_data)
 
                 min_eval_value = float(evaluations[target[min_idx]].outcome)
-                if eval_value < min_eval_value:
+                min_single_score = self.reduce([min_eval_value], parameter)
+                single_score = self.reduce([eval_value], parameter)
+
+                if single_score < min_single_score:
                     min_idx = tc_idx
 
             st_score_fraction = self.reduce(
