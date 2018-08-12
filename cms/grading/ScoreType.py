@@ -275,7 +275,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             <tbody>
     {% for tc in st["testcases"] %}
         {% set display = tc["display"] or (feedback_level == FEEDBACK_LEVEL_FULL) %}
-        {% if display and "outcome" in tc and "text" in tc %}
+        {% if (display or analysis_mode) and "outcome" in tc and "text" in tc %}
             {% if tc["outcome"] == "Correct" %}
                 <tr class="correct">
             {% elif tc["outcome"] == "Not correct" %}
