@@ -253,7 +253,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     </th>
     {% if analysis_mode %}
                     <th class="codename">
-                        {% trans %}Codename{% endtrans %}
+                        {% trans %}Filename{% endtrans %}
                     </th>
     {% endif %}
                     <th class="outcome">
