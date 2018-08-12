@@ -249,7 +249,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             <thead>
                 <tr>
                     <th class="idx">
-                        {% trans %}Case Number{% endtrans %}
+                        {% trans %}Case{% endtrans %}
                     </th>
     {% if analysis_mode %}
                     <th class="codename">
