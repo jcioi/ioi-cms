@@ -115,6 +115,7 @@ class ScoreType(with_metaclass(ABCMeta, object)):
 
     def get_html_details(self, score_details,
                          feedback_level=FEEDBACK_LEVEL_RESTRICTED,
+                         analysis_mode=False,
                          translation=DEFAULT_TRANSLATION):
         """Return an HTML string representing the score details of a
         submission.
@@ -139,6 +140,7 @@ class ScoreType(with_metaclass(ABCMeta, object)):
             try:
                 return self.template.render(details=score_details,
                                             feedback_level=feedback_level,
+                                            analysis_mode=analysis_mode,
                                             translation=translation,
                                             gettext=_, ngettext=n_)
             except Exception:
@@ -249,6 +251,11 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     <th class="idx">
                         {% trans %}Case Number{% endtrans %}
                     </th>
+    {% if analysis_mode %}
+                    <th class="codename">
+                        {% trans %}Codename{% endtrans %}
+                    </th>
+    {% endif %}
                     <th class="outcome">
                         {% trans %}Outcome{% endtrans %}
                     </th>
@@ -277,6 +284,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 <tr class="partiallycorrect">
             {% endif %}
                     <td class="idx">{{ tc["idx"] }}</td>
+            {% if analysis_mode %}
+                    <td class="codename">{{ tc["codename"] }}</td>
+            {% endif %}
                     <td class="outcome">{{ _(tc["outcome"]) }}</td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}

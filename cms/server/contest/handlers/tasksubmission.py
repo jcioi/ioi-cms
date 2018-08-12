@@ -289,12 +289,9 @@ class SubmissionDetailsHandler(ContestHandler):
 
             if sr.scored():
                 feedback_level = task.feedback_level
-                # During analysis mode we show the full feedback regardless of
-                # what the task say.
-                if self.r_params["actual_phase"] == 3:
-                    feedback_level = FEEDBACK_LEVEL_FULL
+                analysis_mode = (self.r_params["actual_phase"] == 3)
                 details = score_type.get_html_details(
-                    details, feedback_level, translation=self.translation)
+                    details, feedback_level, analysis_mode, translation=self.translation)
             else:
                 details = None
 

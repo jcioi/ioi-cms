@@ -665,6 +665,10 @@ td.token_rules p:last-child {
     width: 5%;
 }
 
+#submission_detail table.testcase-list thead th.codename {
+    width: 10%;
+}
+
 #submission_detail table.testcase-list thead th.outcome {
     width: 15%;
 }
