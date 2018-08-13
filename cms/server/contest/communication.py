@@ -37,6 +37,9 @@ from future.builtins import *  # noqa
 
 import logging
 
+import urllib.request
+import json
+
 from cms.db import Question, Announcement, Message
 from cmscommon.datetime import make_timestamp
 
@@ -62,6 +65,17 @@ class UnacceptableQuestion(Exception):
         super(UnacceptableQuestion, self).__init__(subject, text)
         self.subject = subject
         self.text = text
+
+
+def question_webhook(url, subject, text):
+    """Post a question to the webhook url."""
+
+    post_text = "*New Question*\n" \
+                "*Subject*: {}\n" \
+                "*Text*: {}".format(subject, text)
+    json_data = json.dumps({'text': post_text}).encode('utf-8')
+    req = urllib.request.Request(url=url, data=json_data, method='POST')
+    urllib.request.urlopen(req)
 
 
 def accept_question(sql_session, participation, timestamp, subject, text):

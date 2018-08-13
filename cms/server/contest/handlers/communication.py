@@ -39,9 +39,11 @@ import logging
 
 import tornado.web
 
+from cms import config
 from cms.server import multi_contest
 from cms.server.contest.communication import accept_question, \
-    UnacceptableQuestion, QuestionsNotAllowed
+    UnacceptableQuestion, QuestionsNotAllowed, \
+    question_webhook
 
 from .contest import ContestHandler
 
@@ -76,6 +78,11 @@ class QuestionHandler(ContestHandler):
             accept_question(self.sql_session, self.current_user, self.timestamp,
                             self.get_argument("question_subject", ""),
                             self.get_argument("question_text", ""))
+            if hasattr(config, 'question_hook_urls'):
+                for url in config.question_hook_urls:
+                    question_webhook(url,
+                                     self.get_argument("question_subject", ""),
+                                     self.get_argument("question_text", ""))
             self.sql_session.commit()
         except QuestionsNotAllowed:
             raise tornado.web.HTTPError(404)
