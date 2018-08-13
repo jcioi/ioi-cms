@@ -70,10 +70,16 @@ class UnacceptableQuestion(Exception):
 def question_webhook(url, subject, text):
     """Post a question to the webhook url."""
 
-    post_text = "*New Question*\n" \
-                "*Subject*: {}\n" \
-                "*Text*: {}".format(subject, text)
-    json_data = json.dumps({'text': post_text}).encode('utf-8')
+    data = {
+        'text': 'New Question Received',
+        'attachments': [
+            {
+                "title": subject,
+                "text": text,
+            }
+        ]
+    }
+    json_data = json.dumps(data).encode('utf-8')
     req = urllib.request.Request(url=url, data=json_data, method='POST')
     urllib.request.urlopen(req)
 
