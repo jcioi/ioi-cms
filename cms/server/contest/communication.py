@@ -79,9 +79,12 @@ def question_webhook(url, subject, text):
             }
         ]
     }
-    json_data = json.dumps(data).encode('utf-8')
-    req = urllib.request.Request(url=url, data=json_data, method='POST')
-    urllib.request.urlopen(req)
+    try:
+        json_data = json.dumps(data).encode('utf-8')
+        req = urllib.request.Request(url=url, data=json_data, method='POST')
+        urllib.request.urlopen(req, timeout=5)
+    except urllib.error.URLError as err:
+        pass
 
 
 def accept_question(sql_session, participation, timestamp, subject, text):
