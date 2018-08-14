@@ -84,7 +84,7 @@ def question_webhook(url, subject, text):
         req = urllib.request.Request(url=url, data=json_data, method='POST')
         urllib.request.urlopen(req, timeout=5)
     except urllib.error.URLError as err:
-        pass
+        logger.warning("URLError during accessing webhook: {}".format(url))
 
 
 def accept_question(sql_session, participation, timestamp, subject, text):
