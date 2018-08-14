@@ -78,12 +78,12 @@ class QuestionHandler(ContestHandler):
             accept_question(self.sql_session, self.current_user, self.timestamp,
                             self.get_argument("question_subject", ""),
                             self.get_argument("question_text", ""))
+            self.sql_session.commit()
             if hasattr(config, 'question_hook_urls'):
                 for url in config.question_hook_urls:
                     question_webhook(url,
                                      self.get_argument("question_subject", ""),
                                      self.get_argument("question_text", ""))
-            self.sql_session.commit()
         except QuestionsNotAllowed:
             raise tornado.web.HTTPError(404)
         except UnacceptableQuestion as e:
