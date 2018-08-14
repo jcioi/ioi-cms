@@ -83,6 +83,8 @@ def question_webhook(url, subject, text):
         json_data = json.dumps(data).encode('utf-8')
         req = urllib.request.Request(url=url, data=json_data, method='POST')
         urllib.request.urlopen(req, timeout=5)
+    except ValueError:
+        logger.warning('Invalid webhook URL: {}'.format(url))
     except urllib.error.URLError as err:
         logger.warning("URLError during accessing webhook: {}".format(url))
 
