@@ -209,6 +209,8 @@ class Config(object):
         self.s3_backend_fetch_base_url = None
         self.s3_backend_enabled = True
 
+        self.question_hook_urls = []
+
         # Allow user to override config file path using environment
         # variable 'CMS_CONFIG'.
         CMS_CONFIG_ENV_VAR = "CMS_CONFIG"
