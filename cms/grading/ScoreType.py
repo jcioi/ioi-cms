@@ -115,6 +115,7 @@ class ScoreType(with_metaclass(ABCMeta, object)):
 
     def get_html_details(self, score_details,
                          feedback_level=FEEDBACK_LEVEL_RESTRICTED,
+                         analysis_mode=False,
                          translation=DEFAULT_TRANSLATION):
         """Return an HTML string representing the score details of a
         submission.
@@ -139,6 +140,7 @@ class ScoreType(with_metaclass(ABCMeta, object)):
             try:
                 return self.template.render(details=score_details,
                                             feedback_level=feedback_level,
+                                            analysis_mode=analysis_mode,
                                             translation=translation,
                                             gettext=_, ngettext=n_)
             except Exception:
@@ -247,15 +249,20 @@ class ScoreTypeGroup(ScoreTypeAlone):
             <thead>
                 <tr>
                     <th class="idx">
-                        {% trans %}Case Number{% endtrans %}
+                        {% trans %}Case{% endtrans %}
                     </th>
+    {% if analysis_mode %}
+                    <th class="codename">
+                        {% trans %}Filename{% endtrans %}
+                    </th>
+    {% endif %}
                     <th class="outcome">
                         {% trans %}Outcome{% endtrans %}
                     </th>
                     <th class="details">
                         {% trans %}Details{% endtrans %}
                     </th>
-    {% if feedback_level == FEEDBACK_LEVEL_FULL %}
+    {% if analysis_mode or feedback_level == FEEDBACK_LEVEL_FULL %}
                     <th class="execution-time">
                         {% trans %}Execution time{% endtrans %}
                     </th>
@@ -268,20 +275,25 @@ class ScoreTypeGroup(ScoreTypeAlone):
             <tbody>
     {% for tc in st["testcases"] %}
         {% set display = tc["display"] or (feedback_level == FEEDBACK_LEVEL_FULL) %}
-        {% if display and "outcome" in tc and "text" in tc %}
+        {% if (display or analysis_mode) and "outcome" in tc and "text" in tc %}
+            {% set is_hidden = (not display) and analysis_mode %}
+            {% set hidden_class = " hidden-testcase" if is_hidden else "" %}
             {% if tc["outcome"] == "Correct" %}
-                <tr class="correct">
+                <tr class="correct{{ hidden_class }}">
             {% elif tc["outcome"] == "Not correct" %}
-                <tr class="notcorrect">
+                <tr class="notcorrect{{ hidden_class }}">
             {% else %}
-                <tr class="partiallycorrect">
+                <tr class="partiallycorrect{{ hidden_class }}">
             {% endif %}
                     <td class="idx">{{ tc["idx"] }}</td>
+            {% if analysis_mode %}
+                    <td class="codename">{{ tc["codename"] }}</td>
+            {% endif %}
                     <td class="outcome">{{ _(tc["outcome"]) }}</td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}
                     </td>
-            {% if feedback_level == FEEDBACK_LEVEL_FULL %}
+            {% if analysis_mode or feedback_level == FEEDBACK_LEVEL_FULL %}
                     <td class="execution-time">
                 {% if "time" in tc and tc["time"] is not none %}
                         {{ tc["time"]|format_duration }}
@@ -426,7 +438,10 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     public_testcases.append(minimized_data)
 
                 min_eval_value = float(evaluations[target[min_idx]].outcome)
-                if eval_value < min_eval_value:
+                min_single_score = self.reduce([min_eval_value], parameter)
+                single_score = self.reduce([eval_value], parameter)
+
+                if single_score < min_single_score:
                     min_idx = tc_idx
 
             st_score_fraction = self.reduce(

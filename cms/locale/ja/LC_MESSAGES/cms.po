@@ -57,19 +57,19 @@ msgstr ""
 "制限の超過が原因かもしれません。"
 
 msgid "Output is correct"
-msgstr "正解"
+msgstr "出力は正しい"
 
 msgid "Your submission ran and gave the correct answer"
 msgstr "提出されたプログラムは正常終了して、正しい解答を出力しました。"
 
 msgid "Output is partially correct"
-msgstr "部分的に正解"
+msgstr "出力は部分的に正しい"
 
 msgid "Your submission ran and gave the partially correct answer"
 msgstr "提出されたプログラムは正常終了して、部分的に正しい解答を出力しました。"
 
 msgid "Output isn't correct"
-msgstr "不正解"
+msgstr "出力は正しくない"
 
 msgid "Your submission ran, but gave the wrong answer"
 msgstr ""

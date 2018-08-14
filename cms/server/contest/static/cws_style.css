@@ -665,6 +665,10 @@ td.token_rules p:last-child {
     width: 5%;
 }
 
+#submission_detail table.testcase-list thead th.codename {
+    width: 10%;
+}
+
 #submission_detail table.testcase-list thead th.outcome {
     width: 15%;
 }
@@ -702,6 +706,9 @@ td.token_rules p:last-child {
     background-color: #edd400;
 }
 
+#submission_detail table.testcase-list tbody tr.hidden-testcase td.idx {
+    background-color: #e0e0e0;
+}
 
 /*** per-user time box */
 
