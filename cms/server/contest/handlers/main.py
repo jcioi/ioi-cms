@@ -65,6 +65,8 @@ logger = logging.getLogger(__name__)
 def N_(msgid):
     return msgid
 
+STATS_CACHE_SEC = 60
+
 
 class MainHandler(ContestHandler):
     """Home page handler.
@@ -233,6 +235,7 @@ class StatsHandler(ContestHandler):
                 for stat in raw_stats
             ]
 
+        self.set_header('Cache-Control', 'public, max-age={sec}'.format(sec=STATS_CACHE_SEC))
         self.write(json.dumps({'tasks_by_score_rel': stats}))
 
 class PrintingHandler(ContestHandler):

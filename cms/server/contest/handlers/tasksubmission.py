@@ -181,12 +181,8 @@ class TaskScoreHandler(ContestHandler):
         if task is None:
             raise tornado.web.HTTPError(404)
 
-        participation = self.get_current_user()
-        if participation is None:
-            raise tornado.web.HTTPError(404)
-
         participation_joined = self.sql_session.query(Participation)\
-            .filter(Participation.id == participation.id)\
+            .filter(Participation.id == self.current_user.id)\
             .options(joinedload("submissions"))\
             .options(joinedload("submissions.token"))\
             .options(joinedload("submissions.results"))\
