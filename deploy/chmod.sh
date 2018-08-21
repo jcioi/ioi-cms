@@ -20,6 +20,7 @@ chmod +x ./cmscontrib/ImportTeam.py
 chmod +x ./cmscontrib/ImportUser.py
 chmod +x ./cmscontrib/RemoveContest.py
 chmod +x ./cmscontrib/RemoveParticipation.py
+chmod +x ./cmscontrib/RemoveStatement.py
 chmod +x ./cmscontrib/RemoveSubmissions.py
 chmod +x ./cmscontrib/RemoveTask.py
 chmod +x ./cmscontrib/RemoveUser.py

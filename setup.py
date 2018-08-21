@@ -164,6 +164,7 @@ setup(
             "cmsRWSHelper=cmscontrib.RWSHelper:main",
             "cmsRemoveContest=cmscontrib.RemoveContest:main",
             "cmsRemoveParticipation=cmscontrib.RemoveParticipation:main",
+            "cmsRemoveStatement=cmscontrib.RemoveStatement:main",
             "cmsRemoveSubmissions=cmscontrib.RemoveSubmissions:main",
             "cmsRemoveTask=cmscontrib.RemoveTask:main",
             "cmsRemoveUser=cmscontrib.RemoveUser:main",
