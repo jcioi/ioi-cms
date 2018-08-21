@@ -202,7 +202,7 @@ class StatsHandler(ContestHandler):
         if fresh_after < self.timestamp and self.timestamp < fresh_until:
             # the cache is considered to be fresh
             diff = (fresh_until - self.timestamp).total_seconds()
-            cache_age = max(0, diff - 10)
+            cache_age = max(0, round(diff - 10))
             self.set_header('Cache-Control', 'public, max-age={sec}'.format(sec=cache_age))
             self.write(self.contest.stat_cache)
             return
