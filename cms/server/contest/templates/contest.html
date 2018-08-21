@@ -56,10 +56,11 @@ function redrawStats() {
     var new_width = $("#stats").parent().width();
 
     var data = [], consumed_width = 0;
+    let score_stats = stats["tasks_by_score_rel"];
 
-    for(let idx = 0; idx < stats.length; idx++) {
+    for(let idx = 0; idx < score_stats.length; idx++) {
 
-        let stat = stats[idx];
+        let stat = score_stats[idx];
         let ratio = stat["ratio"];
         let name = stat["name"];
         let bar_width = new_width * ratio;
@@ -100,7 +101,11 @@ function redrawStats() {
             d3
                 .select("#stats-tooltip")
                 .html('Hover the graph for information');
-        })
+        });
+
+    const generated_at = stats["generated_at"];
+    document.getElementById("stats-generated-at").innerHTML =
+        "<small>" + generated_at + "</small>";
 }
 
 function reloadStats(){
@@ -109,7 +114,7 @@ function reloadStats(){
 
         }
     }, function(data) {
-        stats = data["tasks_by_score_rel"];
+        stats = data;
         redrawStats();
     });
 }
@@ -241,8 +246,9 @@ function reloadStats(){
                                 Statistics
                             </li>
 
+                            <p id="stats-generated-at"></p>
                             <svg height="20" width="200" id="stats"></svg>
-                            <div id="stats-tooltip">Hover the graph for information</div>
+                            <p id="stats-tooltip">Hover the graph for information</p>
 
                             <li class="divider"></li>
 
