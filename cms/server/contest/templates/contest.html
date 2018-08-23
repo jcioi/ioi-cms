@@ -48,22 +48,22 @@ $(document).ready(function () {
     setInterval(reloadStats, 20000);
 });
 
-var stats = null;
-var colors = ['rgb(255, 102, 102)', 'rgb(51, 153, 255)', 'rgb(102, 204, 0)', 'rgb(128, 128, 128)'];
+let stats = null;
+const colors = ['rgb(255, 102, 102)', 'rgb(51, 153, 255)', 'rgb(102, 204, 0)', 'rgb(128, 128, 128)'];
 
 function redrawStats() {
 
-    var new_width = $("#stats").parent().width();
+    const new_width = $("#stats").parent().width();
 
-    var data = [], consumed_width = 0;
-    let score_stats = stats["tasks_by_score_rel"];
+    const score_stats = stats["tasks_by_score_rel"];
+    let data = [], consumed_width = 0;
 
     for(let idx = 0; idx < score_stats.length; idx++) {
 
-        let stat = score_stats[idx];
-        let ratio = stat["ratio"];
-        let name = stat["name"];
-        let bar_width = new_width * ratio;
+        const task_info = score_stats[idx];
+        const ratio = task_info["ratio"];
+        const name = task_info["name"];
+        const bar_width = new_width * ratio;
 
         data.push({
             name: name,
@@ -102,10 +102,6 @@ function redrawStats() {
                 .select("#stats-tooltip")
                 .html('Hover the graph for information');
         });
-
-    const generated_at = stats["generated_at"];
-    document.getElementById("stats-generated-at").innerHTML =
-        "<small>" + generated_at + "</small>";
 }
 
 function reloadStats(){
@@ -246,7 +242,6 @@ function reloadStats(){
                                 Statistics
                             </li>
 
-                            <p id="stats-generated-at"></p>
                             <svg height="20" width="200" id="stats"></svg>
                             <p id="stats-tooltip">Hover the graph for information</p>
 
