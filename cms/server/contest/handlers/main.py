@@ -39,9 +39,11 @@ import ipaddress
 import json
 import logging
 import datetime
+import time
 
 import tornado.web
 from sqlalchemy.orm import joinedload
+import redis
 
 from cms import config
 from cms.db import PrintJob, Contest
@@ -196,6 +198,30 @@ class StatsHandler(ContestHandler):
     @multi_contest
     def get(self):
 
+        redis_stats_key = '{}contest:{}:stats'.format(config.redis_prefix, self.contest.id)
+        redis_lock_key = '{}contest:{}:stats_lock'.format(config.redis_prefix, self.contest.id)
+        redis_conn = None
+
+        if config.redis_host:
+            redis_conn = redis.StrictRedis(host=config.redis_host,
+                port=config.redis_port, db=config.redis_db)
+
+        if redis_conn:
+
+            while True:
+
+                stats_cache = redis_conn.get(redis_stats_key)
+                if stats_cache is not None:
+                    self.set_header('Cache-Control', 'public, max-age=20')
+                    self.write(stats_cache)
+                    return
+
+                lock = redis_conn.set(redis_lock_key, 'lock', ex=20, nx=True)
+                if lock is not None:
+                    break
+
+                time.sleep(2)
+
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
             .options(joinedload('participations'))\
@@ -234,11 +260,12 @@ class StatsHandler(ContestHandler):
                 for stat in raw_stats
             ]
 
-        stat_text = json.dumps({
-            'tasks_by_score_rel': stats,
-            'generated_at': self.timestamp.isoformat()})
+        stat_text = json.dumps({'tasks_by_score_rel': stats})
 
-        self.set_header('Cache-Control', 'public, max-age=110')
+        if redis_conn:
+            redis_conn.set(redis_stats_key, stat_text, ex=120)
+
+        self.set_header('Cache-Control', 'public, max-age=20')
         self.write(stat_text)
 
 class PrintingHandler(ContestHandler):
