@@ -196,29 +196,6 @@ class StatsHandler(ContestHandler):
     @multi_contest
     def get(self):
 
-        fresh_after = self.contest.stat_cache_generated_at - datetime.timedelta(minutes=5)
-        fresh_until = self.contest.stat_cache_generated_at + datetime.timedelta(minutes=2)
-
-        if fresh_after < self.timestamp and self.timestamp < fresh_until:
-            # the cache is considered to be fresh
-            diff = (fresh_until - self.timestamp).total_seconds()
-            cache_age = max(0, round(diff - 10))
-            self.set_header('Cache-Control', 'public, max-age={sec}'.format(sec=cache_age))
-            self.write(self.contest.stat_cache)
-            return
-
-        try:
-            contest_lock = self.sql_session.query(Contest)\
-                .filter(Contest.id == self.contest.id)\
-                .with_for_update(nowait=True)\
-                .first()
-        except Exception as ex:
-            # maybe there is another thread trying to update the cache
-            # use the stale cache
-            logger.warning(ex)
-            self.write(self.contest.stat_cache)
-            return
-
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
             .options(joinedload('participations'))\
@@ -260,9 +237,6 @@ class StatsHandler(ContestHandler):
         stat_text = json.dumps({
             'tasks_by_score_rel': stats,
             'generated_at': self.timestamp.isoformat()})
-        contest.stat_cache = stat_text
-        contest.stat_cache_generated_at = self.timestamp
-        self.sql_session.commit()
 
         self.set_header('Cache-Control', 'public, max-age=110')
         self.write(stat_text)

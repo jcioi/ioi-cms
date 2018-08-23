@@ -262,15 +262,6 @@ class Contest(Base):
         nullable=False,
         default=0)
 
-    stat_cache = Column(
-        Unicode,
-        nullable=False,
-        default='{}')
-    stat_cache_generated_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime(2000, 1, 1))
-
     # These one-to-many relationships are the reversed directions of
     # the ones defined in the "child" classes using foreign keys.
 
