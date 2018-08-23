@@ -68,6 +68,8 @@ logger = logging.getLogger(__name__)
 def N_(msgid):
     return msgid
 
+CLIENT_STATS_CACHE_TTL = 20
+REDIS_STATS_CACHE_TTL = 120
 
 class MainHandler(ContestHandler):
     """Home page handler.
@@ -212,11 +214,11 @@ class StatsHandler(ContestHandler):
 
                 stats_cache = redis_conn.get(redis_stats_key)
                 if stats_cache is not None:
-                    self.set_header('Cache-Control', 'max-age=20')
+                    self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
                     self.write(stats_cache)
                     return
 
-                lock = redis_conn.set(redis_lock_key, 'lock', ex=20, nx=True)
+                lock = redis_conn.set(redis_lock_key, 'lock', ex=30, nx=True)
                 if lock is not None:
                     break
 
@@ -230,7 +232,7 @@ class StatsHandler(ContestHandler):
             .options(joinedload('participations.submissions.results'))\
             .first()
 
-        raw_stats = []
+        score_list = []
 
         for task in contest.tasks:
 
@@ -244,29 +246,25 @@ class StatsHandler(ContestHandler):
                 t_score = round(t_score, task.score_precision)
                 task_total += t_score
 
-            raw_stats.append({'name': name, 'total': task_total})
+            score_list.append({'name': name, 'total': task_total})
 
-        contest_total = sum(stat['total'] for stat in raw_stats)
-        stat = None
+        contest_total = sum(t['total'] for t in score_list)
+        def compute_ratio(score_sum):
+            if contest_total == 0:
+                return 1.0 / len(contest.tasks)
+            return score_sum / contest_total
 
-        if contest_total == 0:
-            stats = [
-                { 'name': stat['name'], 'ratio': 1.0 / len(contest.tasks) }
-                for stat in raw_stats
-            ]
-        else:
-            stats = [
-                { 'name': stat['name'], 'ratio': stat['total'] / contest_total }
-                for stat in raw_stats
-            ]
-
-        stat_text = json.dumps({'tasks_by_score_rel': stats})
+        stats = [
+            { 'name': t['name'], 'ratio': compute_ratio(t['total']) }
+            for t in score_list
+        ]
+        stats_text = json.dumps({'tasks_by_score_rel': stats})
 
         if redis_conn:
-            redis_conn.set(redis_stats_key, stat_text, ex=120)
+            redis_conn.set(redis_stats_key, stats_text, ex=REDIS_STATS_CACHE_TTL)
 
-        self.set_header('Cache-Control', 'max-age=20')
-        self.write(stat_text)
+        self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
+        self.write(stats_text)
 
 class PrintingHandler(ContestHandler):
     """Serve the interface to print and handle submitted print jobs.
