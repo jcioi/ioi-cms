@@ -212,7 +212,7 @@ class StatsHandler(ContestHandler):
 
                 stats_cache = redis_conn.get(redis_stats_key)
                 if stats_cache is not None:
-                    self.set_header('Cache-Control', 'public, max-age=20')
+                    self.set_header('Cache-Control', 'max-age=20')
                     self.write(stats_cache)
                     return
 
@@ -265,7 +265,7 @@ class StatsHandler(ContestHandler):
         if redis_conn:
             redis_conn.set(redis_stats_key, stat_text, ex=120)
 
-        self.set_header('Cache-Control', 'public, max-age=20')
+        self.set_header('Cache-Control', 'max-age=20')
         self.write(stat_text)
 
 class PrintingHandler(ContestHandler):
