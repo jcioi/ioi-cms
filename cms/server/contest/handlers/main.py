@@ -202,23 +202,18 @@ class StatsHandler(ContestHandler):
 
         redis_stats_key = '{}contest:{}:stats'.format(config.redis_prefix, self.contest.id)
         redis_lock_key = '{}contest:{}:stats_lock'.format(config.redis_prefix, self.contest.id)
-        redis_conn = None
 
-        if config.redis_host:
-            redis_conn = redis.StrictRedis(host=config.redis_host,
-                port=config.redis_port, db=config.redis_db)
-
-        if redis_conn:
+        if self.redis_conn:
 
             while True:
 
-                stats_cache = redis_conn.get(redis_stats_key)
+                stats_cache = self.redis_conn.get(redis_stats_key)
                 if stats_cache is not None:
                     self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
                     self.write(stats_cache)
                     return
 
-                lock = redis_conn.set(redis_lock_key, 'lock', ex=30, nx=True)
+                lock = self.redis_conn.set(redis_lock_key, 'lock', ex=30, nx=True)
                 if lock is not None:
                     break
 
@@ -260,8 +255,8 @@ class StatsHandler(ContestHandler):
         ]
         stats_text = json.dumps({'tasks_by_score_rel': stats})
 
-        if redis_conn:
-            redis_conn.set(redis_stats_key, stats_text, ex=REDIS_STATS_CACHE_TTL)
+        if self.redis_conn:
+            self.redis_conn.set(redis_stats_key, stats_text, ex=REDIS_STATS_CACHE_TTL)
 
         self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
         self.write(stats_text)

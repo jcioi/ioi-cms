@@ -112,9 +112,7 @@ class Config(object):
         self.twophase_commit = False
 
         # Redis.
-        self.redis_host = None
-        self.redis_port = 6379
-        self.redis_db = 0
+        self.redis_url = None
         self.redis_prefix = "cms:"
 
         # Worker.
