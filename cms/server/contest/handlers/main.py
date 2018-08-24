@@ -202,6 +202,7 @@ class StatsHandler(ContestHandler):
 
         redis_stats_key = '{}contest:{}:stats'.format(config.redis_prefix, self.contest.id)
         redis_lock_key = '{}contest:{}:stats_lock'.format(config.redis_prefix, self.contest.id)
+        redis_update_key = '{}contest:{}:stats_update'.format(config.redis_prefix, self.contest.id)
 
         if self.redis_conn:
 
@@ -217,7 +218,13 @@ class StatsHandler(ContestHandler):
                 if lock is not None:
                     break
 
-                time.sleep(2)
+                pubsub = self.redis_conn.pubsub(ignore_subscribe_messages=True)
+                try:
+                    pubsub.subscribe(redis_update_key)
+                    pubsub.get_message(timeout=30)
+                    pubsub.unsubscribe()
+                finally:
+                    pubsub.close()
 
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
@@ -257,6 +264,7 @@ class StatsHandler(ContestHandler):
 
         if self.redis_conn:
             self.redis_conn.set(redis_stats_key, stats_text, ex=REDIS_STATS_CACHE_TTL)
+            self.redis_conn.publish(redis_update_key, 'updated')
 
         self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
         self.write(stats_text)
