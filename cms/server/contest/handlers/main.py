@@ -34,6 +34,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
+from contextlib import closing
 
 import ipaddress
 import json
@@ -216,13 +217,10 @@ class StatsHandler(ContestHandler):
                 if lock is not None:
                     break
 
-                pubsub = self.redis_conn.pubsub(ignore_subscribe_messages=True)
-                try:
+                with closing(self.redis_conn.pubsub(ignore_subscribe_messages=True)) as pubsub:
                     pubsub.subscribe(redis_update_key)
                     pubsub.get_message(timeout=30)
                     pubsub.unsubscribe()
-                finally:
-                    pubsub.close()
 
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
