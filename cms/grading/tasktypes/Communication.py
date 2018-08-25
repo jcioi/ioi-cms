@@ -90,6 +90,8 @@ class Communication(TaskType):
     # in case of a user test.
     OUTPUT_FILENAME = "output.txt"
 
+    STUB_PRELOAD_FILENAME = "stub_preload"
+
     ALLOW_PARTIAL_SUBMISSION = False
 
     _NUM_PROCESSES = ParameterTypeInt(
@@ -247,6 +249,10 @@ class Communication(TaskType):
         for i in indices:
             sandbox_user[i].create_file_from_storage(
                 executable_filename, executable_digest, executable=True)
+            if Communication.STUB_PRELOAD_FILENAME in job.managers:
+                digest = job.managers[Communication.STUB_PRELOAD_FILENAME].digest
+                sandbox_user[i].create_file_from_storage(
+                    Communication.STUB_PRELOAD_FILENAME, digest, executable=True)
 
         # Start the manager. Redirecting to stdin is unnecessary, but for
         # historical reasons the manager can choose to read from there
@@ -296,9 +302,19 @@ class Communication(TaskType):
             # that don't need tight control.
             if len(commands) > 1:
                 trusted_step(sandbox_user[i], commands[:-1])
+
+            last_cmd = commands[-1]
+
+            # Inject preload program if needed
+            if Communication.STUB_PRELOAD_FILENAME in job.managers:
+                last_cmd = [
+                    "./%s" % Communication.STUB_PRELOAD_FILENAME,
+                    fifo_out[i], fifo_in[i]
+                ] + commands[-1]
+
             processes[i] = evaluation_step_before_run(
                 sandbox_user[i],
-                commands[-1],
+                last_cmd,
                 job.time_limit,
                 job.memory_limit,
                 allow_dirs=[fifo_dir[i]],
