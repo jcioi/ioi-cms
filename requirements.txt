@@ -33,3 +33,4 @@ PyPDF2>=1.26,<1.27  # https://github.com/mstamy2/PyPDF2/blob/master/CHANGELOG
 
 # IOI2018 custom
 boto3>=1.7
+redis>=2.10,<2.11

@@ -34,6 +34,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
+from contextlib import closing
 
 import ipaddress
 import json
@@ -41,6 +42,7 @@ import logging
 
 import tornado.web
 from sqlalchemy.orm import joinedload
+import redis
 
 from cms import config
 from cms.db import PrintJob, Contest
@@ -65,8 +67,8 @@ logger = logging.getLogger(__name__)
 def N_(msgid):
     return msgid
 
-STATS_CACHE_SEC = 60
-
+CLIENT_STATS_CACHE_TTL = 20
+REDIS_STATS_CACHE_TTL = 120
 
 class MainHandler(ContestHandler):
     """Home page handler.
@@ -197,6 +199,31 @@ class StatsHandler(ContestHandler):
     @multi_contest
     def get(self):
 
+        redis_stats_key = '{}contest:{}:stats'.format(config.redis_prefix, self.contest.id)
+        redis_lock_key = '{}contest:{}:stats_lock'.format(config.redis_prefix, self.contest.id)
+        redis_update_key = '{}contest:{}:stats_update'.format(config.redis_prefix, self.contest.id)
+        redis_lock = None
+
+        if self.redis_conn:
+
+            redis_lock = self.redis_conn.lock(redis_lock_key, timeout=30)
+
+            while True:
+
+                stats_cache = self.redis_conn.get(redis_stats_key)
+                if stats_cache is not None:
+                    self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
+                    self.write(stats_cache)
+                    return
+
+                if redis_lock.acquire(blocking=False):
+                    break
+
+                with closing(self.redis_conn.pubsub(ignore_subscribe_messages=True)) as pubsub:
+                    pubsub.subscribe(redis_update_key)
+                    pubsub.get_message(timeout=30)
+                    pubsub.unsubscribe()
+
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
             .options(joinedload('participations'))\
@@ -205,7 +232,7 @@ class StatsHandler(ContestHandler):
             .options(joinedload('participations.submissions.results'))\
             .first()
 
-        raw_stats = []
+        score_list = []
 
         for task in contest.tasks:
 
@@ -219,24 +246,27 @@ class StatsHandler(ContestHandler):
                 t_score = round(t_score, task.score_precision)
                 task_total += t_score
 
-            raw_stats.append({'name': name, 'total': task_total})
+            score_list.append({'name': name, 'total': task_total})
 
-        contest_total = sum(stat['total'] for stat in raw_stats)
-        stat = None
+        contest_total = sum(t['total'] for t in score_list)
+        def compute_ratio(score_sum):
+            if contest_total == 0:
+                return 1.0 / len(contest.tasks)
+            return score_sum / contest_total
 
-        if contest_total == 0:
-            stats = [
-                { 'name': stat['name'], 'ratio': 1.0 / len(contest.tasks) }
-                for stat in raw_stats
-            ]
-        else:
-            stats = [
-                { 'name': stat['name'], 'ratio': stat['total'] / contest_total }
-                for stat in raw_stats
-            ]
+        stats = [
+            { 'name': t['name'], 'ratio': compute_ratio(t['total']) }
+            for t in score_list
+        ]
+        stats_text = json.dumps({'tasks_by_score_rel': stats})
 
-        self.set_header('Cache-Control', 'public, max-age={sec}'.format(sec=STATS_CACHE_SEC))
-        self.write(json.dumps({'tasks_by_score_rel': stats}))
+        if self.redis_conn:
+            self.redis_conn.set(redis_stats_key, stats_text, ex=REDIS_STATS_CACHE_TTL)
+            self.redis_conn.publish(redis_update_key, 'updated')
+            redis_lock.release()
+
+        self.set_header('Cache-Control', 'max-age={}'.format(CLIENT_STATS_CACHE_TTL))
+        self.write(stats_text)
 
 class PrintingHandler(ContestHandler):
     """Serve the interface to print and handle submitted print jobs.

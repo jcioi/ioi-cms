@@ -40,9 +40,11 @@ from future.moves.urllib.parse import quote, urlencode
 
 from functools import wraps
 from tornado.web import RequestHandler
+import redis
 
 import gevent
 
+from cms import config
 from cms.db import Session
 from cms.db.filecacher import FileCacher
 from cmscommon.datetime import make_datetime
@@ -224,6 +226,10 @@ class CommonRequestHandler(RequestHandler):
         self.r_params = None
         self.contest = None
         self.url = None
+        self.redis_conn = None
+
+        if config.redis_url:
+            self.redis_conn = redis.StrictRedis.from_url(config.redis_url)
 
     def prepare(self):
         """This method is executed at the beginning of each request.
