@@ -54,6 +54,12 @@ def default_assign(dest, src, key, conv=lambda i:i):
 def assign(dest, src, key, conv=lambda i:i):
     dest[key] = conv(src[key])
 
+def compile_judge_program(name, dest, src):
+    ret = subprocess.call(AUTO_COMPILATION_CMD + [src, '-o', dest])
+    if ret != 0:
+        return None
+    return (name, dest)
+
 class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
     """Load a contest, task or user stored using Improved Imoj format.
@@ -374,8 +380,8 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
         # additional files detection
         headers = []
-        stubs, graders, manager, checker = [], [], None, None
-        manager_src, checker_src = None, None
+        stubs, graders, manager, checker, stub_preload = [], [], None, None, None
+        manager_src, checker_src, stub_preload_src = None, None, None
 
         for fname in os.listdir(cms_path):
 
@@ -394,21 +400,29 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
                 manager_src = path
             if fname == 'checker.cpp':
                 checker_src = path
+            if fname == 'stub_preload.cpp':
+                stub_preload_src = path
 
         # auto compilation
         if manager_src:
-            manager = ('manager', os.path.join(cms_path, 'manager'))
             logger.info("manager auto compilation")
-            ret = subprocess.call(AUTO_COMPILATION_CMD + [manager_src, '-o', manager[1]])
-            if ret != 0:
+            manager = compile_judge_program('manager', os.path.join(cms_path, 'manager'), manager_src)
+            if manager is None:
                 logger.critical("manager compilation failed")
                 return None
+
         if checker_src:
-            checker = ('checker', os.path.join(cms_path, 'checker'))
             logger.info("checker auto compilation")
-            ret = subprocess.call(AUTO_COMPILATION_CMD + [checker_src, '-o', checker[1]])
-            if ret != 0:
+            checker = compile_judge_program('checker', os.path.join(cms_path, 'checker'), checker_src)
+            if checker is None:
                 logger.critical("checker compilation failed")
+                return None
+
+        if stub_preload_src:
+            logger.info("stub_preload auto compilation")
+            stub_preload = compile_judge_program('stub_preload', os.path.join(cms_path, 'stub_preload'), stub_preload_src)
+            if stub_preload is None:
+                logger.critical("stub_preload compilation failed")
                 return None
 
         # statements detection & registration
@@ -609,6 +623,8 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
             extra_files.append(manager)
         if checker:
             extra_files.append(checker)
+        if stub_preload:
+            extra_files.append(stub_preload)
 
         for fname, path in extra_files:
             digest = self.file_cacher.put_file_from_path(path,

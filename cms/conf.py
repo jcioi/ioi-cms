@@ -111,6 +111,10 @@ class Config(object):
         self.database_debug = False
         self.twophase_commit = False
 
+        # Redis.
+        self.redis_url = None
+        self.redis_prefix = "cms:"
+
         # Worker.
         self.keep_sandbox = True
         self.use_cgroups = True
