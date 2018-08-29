@@ -122,11 +122,11 @@ def compute_metrics(sql_session):
     metrics['judgements_total'] = {}
     for cs, status in judgements_list:
         for c in cs:
-            cname, tname, uname, ddesc, is_active, autojudge, count = c
-            active = 'active' if is_active else 'inactive'
-            if not is_active and not autojudge and (status in ['compiling', 'evaluating', 'scoring']):
-                status = 'pending'
-            key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ddesc), ('dataset_status', active), ('status', status))
+            cname, tname, uname, ds_desc, ds_active, ds_autojudge, count = c
+            ds_status = 'official'
+            if not ds_active:
+                ds_status = 'active' if ds_autojudge else 'inactive'
+            key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ds_desc), ('dataset_status', ds_status), ('status', status))
             metrics['judgements_total'][key] = count
 
     return (metrics, descs)
