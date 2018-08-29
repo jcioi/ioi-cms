@@ -53,7 +53,7 @@ def compute_metrics(sql_session):
     sub_official_counts = sub_full_query.filter(Submission.official).all()
     sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
 
-    descs['submissions_total'] = ('gauge', None, ['status = official / unofficial'])
+    descs['submissions_total'] = ('gauge', 'status = official / unofficial')
     metrics['submissions_total'] = {}
     for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
         for c in cs:
@@ -120,7 +120,7 @@ def compute_metrics(sql_session):
 
     status_list = " / ".join(map(lambda l: l[1], judgements_list))
 
-    descs['judgements_total'] = ('gauge', None, ['status = {}'.format(status_list), 'dataset_status = official / active / inactive'])
+    descs['judgements_total'] = ('gauge', 'status = {}\\ndataset_status = official / active / inactive'.format(status_list))
     metrics['judgements_total'] = {}
     for cs, status in judgements_list:
         for c in cs:
@@ -152,7 +152,7 @@ def compute_metrics(sql_session):
 
     status_list = " / ".join(map(lambda l: l[1], question_list))
 
-    descs['questions_total'] = ('gauge', None, ['status = {}'.format(status_list)])
+    descs['questions_total'] = ('gauge', 'status = {}'.format(status_list))
     metrics['questions_total'] = {}
     for qs, status in question_list:
         for q in qs:
@@ -179,12 +179,10 @@ class MetricsHandler(CommonRequestHandler):
         for metric_key, metric_values in metrics.items():
 
             if metric_key in descs:
-                metric_type, metric_help, metric_comments = descs[metric_key]
+                metric_type, metric_help = descs[metric_key]
                 self.write('# TYPE cms_{} {}\n'.format(metric_key, metric_type))
                 if metric_help is not None:
                     self.write('# HELP cms_{} {}\n'.format(metric_key, metric_help))
-                for c in metric_comments:
-                    self.write('# comment: {}\n'.format(c))
 
             for labels, value in metric_values.items():
                 if labels:
