@@ -54,7 +54,7 @@ class MetricsHandler(CommonRequestHandler):
         sub_official_counts = sub_full_query.filter(Submission.official).all()
         sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
 
-        descs['submissions_total'] = ('counter', None)
+        descs['submissions_total'] = ('gauge', None)
         metrics['submissions_total'] = {}
         for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
             for c in cs:
