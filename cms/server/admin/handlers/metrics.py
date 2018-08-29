@@ -27,9 +27,7 @@ from future.builtins import *  # noqa
 import logging
 
 from sqlalchemy import func, not_
-from sqlalchemy.orm import subqueryload
 
-from cms.grading import task_score
 from cms.service import EvaluationService
 from cms.server import CommonRequestHandler
 from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult, Question, Team, Evaluation
@@ -187,37 +185,6 @@ def compute_metrics(sql_session):
         cname, tname, uname, ddesc, wtime = e
         key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ddesc))
         metrics['wall_clock_time_total'][key] = wtime
-
-    all_contests = sql_session.query(Contest)\
-        .options(subqueryload('tasks'))\
-        .options(subqueryload('participations'))\
-        .options(subqueryload('participations.team'))\
-        .options(subqueryload('participations.user'))\
-        .options(subqueryload('participations.submissions'))\
-        .options(subqueryload('participations.submissions.token'))\
-        .options(subqueryload('participations.submissions.results'))
-
-    descs['score'] = ('gauge', None)
-    metrics['score'] = {}
-
-    for contest in all_contests:
-        for participation in contest.participations:
-
-            contest_key = (('contest', contest.name), ('user', participation.user.username))
-            sc_sum = 0
-
-            for task in contest.tasks:
-
-                task_key = (('contest', contest.name), ('task', task.name), ('user', participation.user.username))
-
-                sc, _ = task_score(participation, task)
-                sc = round(sc, task.score_precision)
-                sc_sum += sc
-
-                metrics['score'][task_key] = sc
-
-            sc_sum = round(sc_sum, contest.score_precision)
-            metrics['score'][contest_key] = sc_sum
 
     return (metrics, descs)
 
