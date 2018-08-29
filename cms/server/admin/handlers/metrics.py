@@ -28,38 +28,120 @@ import logging
 
 from sqlalchemy import func, not_
 
+from cms.service import EvaluationService
 from cms.server import CommonRequestHandler
-from cms.db import User, Contest, Task, Submission, Participation
+from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult
 
 
 logger = logging.getLogger(__name__)
 
 
+def compute_metrics(sql_session):
+
+    metrics = {}
+    descs = {}
+
+    sub_full_query = sql_session.query(Contest.name, Task.name, User.username, func.count(Submission.id))\
+        .select_from(Participation)\
+        .filter(not_(Participation.hidden))\
+        .join(User, User.id == Participation.user_id)\
+        .join(Contest, Contest.id == Participation.contest_id)\
+        .join(Submission, Submission.participation_id == Participation.id)\
+        .join(Task, Task.id == Submission.task_id)\
+        .group_by(Contest.id, Task.id, User.id)
+
+    sub_official_counts = sub_full_query.filter(Submission.official).all()
+    sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
+
+    descs['submissions_total'] = ('gauge', None)
+    metrics['submissions_total'] = {}
+    for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
+        for c in cs:
+            cname, tname, uname, count = c
+            metrics['submissions_total'][(('contest', cname), ('task', tname), ('user', uname), ('status', status))] = count
+
+    res_full_query = sql_session.query(
+        Contest.name, Task.name, User.username,
+        Dataset.description, Dataset.id == Task.active_dataset_id, Dataset.autojudge, func.count(SubmissionResult.submission_id))\
+        .select_from(Participation)\
+        .filter(not_(Participation.hidden))\
+        .join(User, User.id == Participation.user_id)\
+        .join(Contest, Contest.id == Participation.contest_id)\
+        .join(Submission, Submission.participation_id == Participation.id)\
+        .join(Task, Task.id == Submission.task_id)\
+        .join(SubmissionResult, SubmissionResult.submission_id == Submission.id)\
+        .join(Dataset, Dataset.id == SubmissionResult.dataset_id)\
+        .group_by(Contest.id, Task.id, User.id, Dataset.id)
+
+    res_compiling_query = res_full_query.filter(not_(SubmissionResult.filter_compiled()))
+    res_evaluating_query = res_full_query.filter(
+        SubmissionResult.filter_compilation_succeeded(),
+        not_(SubmissionResult.filter_evaluated()))
+    res_evaluated_query = res_full_query.filter(
+        SubmissionResult.filter_compilation_succeeded(),
+        SubmissionResult.filter_evaluated())
+
+    res_compiling_ok = res_compiling_query.filter(
+        SubmissionResult.compilation_tries <
+        EvaluationService.EvaluationService.MAX_COMPILATION_TRIES)\
+        .all()
+    res_compiling_stop = res_compiling_query.filter(
+        SubmissionResult.compilation_tries >=
+        EvaluationService.EvaluationService.MAX_COMPILATION_TRIES)\
+        .all()
+    res_compilation_failed = res_full_query.filter(
+        SubmissionResult.filter_compilation_failed())\
+        .all()
+
+    res_evaluating_ok = res_evaluating_query.filter(
+        SubmissionResult.evaluation_tries <
+        EvaluationService.EvaluationService.MAX_EVALUATION_TRIES)\
+        .all()
+    res_evaluating_stop = res_evaluating_query.filter(
+        SubmissionResult.evaluation_tries >=
+        EvaluationService.EvaluationService.MAX_EVALUATION_TRIES)\
+        .all()
+    res_scoring = res_evaluated_query.filter(
+        not_(SubmissionResult.filter_scored()))\
+        .all()
+    res_scored = res_evaluated_query.filter(
+        SubmissionResult.filter_scored())\
+        .all()
+
+    judgements_list = [
+        (res_compiling_ok, 'compiling'),
+        (res_compiling_stop, 'stuck_in_compilation'),
+        (res_compilation_failed, 'compilation_failed'),
+        (res_evaluating_ok, 'evaluating'),
+        (res_evaluating_stop, 'stuck_in_evaluation'),
+        (res_scoring, 'scoring'),
+        (res_scored, 'scored'),
+    ]
+
+    descs['judgements_total'] = ('gauge', None)
+    metrics['judgements_total'] = {}
+    for cs, status in judgements_list:
+        for c in cs:
+            cname, tname, uname, ddesc, is_active, autojudge, count = c
+            active = 'active' if is_active else 'inactive'
+            if not is_active and not autojudge and (status in ['compiling', 'evaluating', 'scoring']):
+                status = 'pending'
+            key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ddesc), ('dataset_status', active), ('status', status))
+            metrics['judgements_total'][key] = count
+
+    return (metrics, descs)
+
 class MetricsHandler(CommonRequestHandler):
 
     def get(self):
 
-        metrics = {}
-        descs = {}
+        metrics, descs = None, None
 
-        sub_full_query = self.sql_session.query(User.username, Contest.name, Task.name, func.count(Submission.id))\
-            .select_from(Participation)\
-            .filter(not_(Participation.hidden))\
-            .join(User, User.id == Participation.user_id)\
-            .join(Contest, Contest.id == Participation.contest_id)\
-            .join(Submission, Submission.participation_id == Participation.id)\
-            .join(Task, Task.id == Submission.task_id)\
-            .group_by(User.username, Contest.name, Task.name)
-
-        sub_official_counts = sub_full_query.filter(Submission.official).all()
-        sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
-
-        descs['submissions_total'] = ('gauge', None)
-        metrics['submissions_total'] = {}
-        for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
-            for c in cs:
-                uname, cname, tname, count = c
-                metrics['submissions_total'][(('contest', cname), ('task', tname), ('user', uname), ('status', status))] = count
+        try:
+            metrics, descs = compute_metrics(self.sql_session)
+        except Exception as err:
+            logger.error(err)
+            return
 
         for metric_key, metric_values in metrics.items():
 
