@@ -27,7 +27,7 @@ from future.builtins import *  # noqa
 import logging
 
 from sqlalchemy import func, not_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import subqueryload
 
 from cms.grading import task_score
 from cms.service import EvaluationService
@@ -189,13 +189,13 @@ def compute_metrics(sql_session):
         metrics['wall_clock_time_total'][key] = wtime
 
     all_contests = sql_session.query(Contest)\
-        .options(joinedload('tasks'))\
-        .options(joinedload('participations'))\
-        .options(joinedload('participations.team'))\
-        .options(joinedload('participations.user'))\
-        .options(joinedload('participations.submissions'))\
-        .options(joinedload('participations.submissions.token'))\
-        .options(joinedload('participations.submissions.results'))
+        .options(subqueryload('tasks'))\
+        .options(subqueryload('participations'))\
+        .options(subqueryload('participations.team'))\
+        .options(subqueryload('participations.user'))\
+        .options(subqueryload('participations.submissions'))\
+        .options(subqueryload('participations.submissions.token'))\
+        .options(subqueryload('participations.submissions.results'))
 
     descs['score'] = ('gauge', None)
     metrics['score'] = {}
