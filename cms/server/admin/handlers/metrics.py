@@ -30,7 +30,7 @@ from sqlalchemy import func, not_
 
 from cms.service import EvaluationService
 from cms.server import CommonRequestHandler
-from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult
+from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult, Question, Team
 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +130,37 @@ def compute_metrics(sql_session):
                 ds_status = 'active' if ds_autojudge else 'inactive'
             key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ds_desc), ('dataset_status', ds_status), ('status', status))
             metrics['judgements_total'][key] = count
+
+    question_query = sql_session.query(Contest.name, Team.name, User.username, func.count(Question.id))\
+        .select_from(Participation)\
+        .filter(not_(Participation.hidden))\
+        .outerjoin(Team, Team.id == Participation.team_id)\
+        .join(User, User.id == Participation.user_id)\
+        .join(Contest, Contest.id == Participation.contest_id)\
+        .join(Question, Question.participation_id == Participation.id)\
+        .group_by(Contest.id, Team.id, User.id)
+
+    question_answered = question_query.filter(not_(Question.reply_timestamp.is_(None))).all()
+    question_ignored = question_query.filter(Question.ignored.is_(True)).all()
+    question_pending = question_query.filter(Question.reply_timestamp.is_(None)).filter(Question.ignored.is_(False)).all()
+
+    question_list = [
+        (question_answered, 'answered'),
+        (question_ignored, 'ignored'),
+        (question_pending, 'pending'),
+    ]
+
+    status_list = " / ".join(map(lambda l: l[1], question_list))
+
+    descs['questions_total'] = ('gauge', None, ['status = {}'.format(status_list)])
+    metrics['questions_total'] = {}
+    for qs, status in question_list:
+        for q in qs:
+            cname, tname, uname, count = q
+            key = (('contest', cname), ('team', tname), ('user', uname), ('status', status))
+            if tname is None:
+                key = (('contest', cname), ('user', uname), ('status', status))
+            metrics['questions_total'][key] = count
 
     return (metrics, descs)
 
