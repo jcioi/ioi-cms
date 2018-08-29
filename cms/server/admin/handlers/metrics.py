@@ -53,7 +53,7 @@ def compute_metrics(sql_session):
     sub_official_counts = sub_full_query.filter(Submission.official).all()
     sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
 
-    descs['submissions_total'] = ('gauge', 'status = official / unofficial')
+    descs['submissions_total'] = ('gauge', 'status = official | unofficial')
     metrics['submissions_total'] = {}
     for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
         for c in cs:
@@ -61,8 +61,8 @@ def compute_metrics(sql_session):
             metrics['submissions_total'][(('contest', cname), ('task', tname), ('user', uname), ('status', status))] = count
 
     res_full_query = sql_session.query(
-        Contest.name, Task.name, User.username,
-        Dataset.description, Dataset.id == Task.active_dataset_id, Dataset.autojudge, func.count(SubmissionResult.submission_id))\
+        Contest.name, Task.name, User.username, Dataset.description,
+        Dataset.id == Task.active_dataset_id, Dataset.autojudge, func.count(SubmissionResult.submission_id))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
         .join(User, User.id == Participation.user_id)\
@@ -118,9 +118,9 @@ def compute_metrics(sql_session):
         (res_scored, 'scored'),
     ]
 
-    status_list = " / ".join(map(lambda l: l[1], judgements_list))
+    status_list = " | ".join(map(lambda l: l[1], judgements_list))
 
-    descs['judgements_total'] = ('gauge', 'status = {}\\ndataset_status = official / active / inactive'.format(status_list))
+    descs['judgements_total'] = ('gauge', 'status = {}\\ndataset_status = official | active | inactive'.format(status_list))
     metrics['judgements_total'] = {}
     for cs, status in judgements_list:
         for c in cs:
@@ -140,9 +140,9 @@ def compute_metrics(sql_session):
         .join(Question, Question.participation_id == Participation.id)\
         .group_by(Contest.id, Team.id, User.id)
 
-    question_answered = question_query.filter(not_(Question.reply_timestamp.is_(None))).all()
+    question_answered = question_query.filter(Question.reply_timestamp.isnot(None)).all()
     question_ignored = question_query.filter(Question.ignored.is_(True)).all()
-    question_pending = question_query.filter(Question.reply_timestamp.is_(None)).filter(Question.ignored.is_(False)).all()
+    question_pending = question_query.filter(Question.reply_timestamp.is_(None), Question.ignored.is_(False)).all()
 
     question_list = [
         (question_answered, 'answered'),
@@ -150,7 +150,7 @@ def compute_metrics(sql_session):
         (question_pending, 'pending'),
     ]
 
-    status_list = " / ".join(map(lambda l: l[1], question_list))
+    status_list = " | ".join(map(lambda l: l[1], question_list))
 
     descs['questions_total'] = ('gauge', 'status = {}'.format(status_list))
     metrics['questions_total'] = {}
