@@ -32,7 +32,7 @@ from sqlalchemy.orm import joinedload
 from cms.grading import task_score
 from cms.service import EvaluationService
 from cms.server import CommonRequestHandler
-from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult, Question, Team
+from cms.db import User, Contest, Task, Submission, Participation, Dataset, SubmissionResult, Question, Team, Evaluation
 
 
 logger = logging.getLogger(__name__)
@@ -163,6 +163,30 @@ def compute_metrics(sql_session):
             if tname is None:
                 key = (('contest', cname), ('user', uname), ('status', status))
             metrics['questions_total'][key] = count
+
+    evals = sql_session.query(
+        Contest.name, Task.name, User.username,
+        Dataset.description, func.sum(Evaluation.execution_wall_clock_time))\
+        .select_from(Participation)\
+        .filter(not_(Participation.hidden))\
+        .join(User, User.id == Participation.user_id)\
+        .join(Contest, Contest.id == Participation.contest_id)\
+        .join(Submission, Submission.participation_id == Participation.id)\
+        .join(Task, Task.id == Submission.task_id)\
+        .join(SubmissionResult, SubmissionResult.submission_id == Submission.id)\
+        .join(Dataset, Dataset.id == SubmissionResult.dataset_id)\
+        .join(Evaluation, Evaluation.submission_id == Submission.id)\
+        .filter(Evaluation.dataset_id == Dataset.id)\
+        .group_by(Contest.id, Task.id, User.id, Dataset.id)\
+        .all()
+
+    descs['wall_clock_time_total'] = ('gauge', None)
+    metrics['wall_clock_time_total'] = {}
+
+    for e in evals:
+        cname, tname, uname, ddesc, wtime = e
+        key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ddesc))
+        metrics['wall_clock_time_total'][key] = wtime
 
     all_contests = sql_session.query(Contest)\
         .options(joinedload('tasks'))\
