@@ -38,20 +38,25 @@ logger = logging.getLogger(__name__)
 
 def filter_none(items):
     return list(filter(lambda kv: (kv[1] is not None), items))
+def get_dataset_status(is_live, autojudge):
+    if is_live:
+        return 'live'
+    return 'active' if autojudge else 'inactive'
 
 def compute_metrics(sql_session):
 
     metrics = {}
     descs = {}
 
-    sub_full_query = sql_session.query(Contest.name, Task.name, User.username, func.count(Submission.id))\
+    sub_full_query = sql_session.query(Contest.name, Task.name, Team.code, User.username, func.count(Submission.id))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
+        .outerjoin(Team, Team.id == Participation.team_id)\
         .join(User, User.id == Participation.user_id)\
         .join(Contest, Contest.id == Participation.contest_id)\
         .join(Submission, Submission.participation_id == Participation.id)\
         .join(Task, Task.id == Submission.task_id)\
-        .group_by(Contest.id, Task.id, User.id)
+        .group_by(Contest.id, Task.id, Team.id, User.id)
 
     sub_official_counts = sub_full_query.filter(Submission.official).all()
     sub_unofficial_counts = sub_full_query.filter(not_(Submission.official)).all()
@@ -60,21 +65,23 @@ def compute_metrics(sql_session):
     metrics['submissions_total'] = {}
     for cs, status in [(sub_official_counts, 'official'), (sub_unofficial_counts, 'unofficial')]:
         for c in cs:
-            cname, tname, uname, count = c
-            metrics['submissions_total'][(('contest', cname), ('task', tname), ('user', uname), ('status', status))] = count
+            cname, taskname, teamname, uname, count = c
+            key = (('contest', cname), ('task', taskname), ('team', teamname), ('user', uname), ('status', status))
+            metrics['submissions_total'][key] = count
 
     res_full_query = sql_session.query(
-        Contest.name, Task.name, User.username, Dataset.description,
+        Contest.name, Task.name, Team.code, User.username, Dataset.description,
         Dataset.id == Task.active_dataset_id, Dataset.autojudge, func.count(SubmissionResult.submission_id))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
+        .outerjoin(Team, Team.id == Participation.team_id)\
         .join(User, User.id == Participation.user_id)\
         .join(Contest, Contest.id == Participation.contest_id)\
         .join(Submission, Submission.participation_id == Participation.id)\
         .join(Task, Task.id == Submission.task_id)\
         .join(SubmissionResult, SubmissionResult.submission_id == Submission.id)\
         .join(Dataset, Dataset.id == SubmissionResult.dataset_id)\
-        .group_by(Contest.id, Task.id, User.id, Dataset.id)
+        .group_by(Contest.id, Task.id, Team.id, User.id, Dataset.id)
 
     res_compiling_query = res_full_query.filter(not_(SubmissionResult.filter_compiled()))
     res_evaluating_query = res_full_query.filter(
@@ -123,18 +130,17 @@ def compute_metrics(sql_session):
 
     status_list = " | ".join(map(lambda l: l[1], judgements_list))
 
-    descs['judgements_total'] = ('gauge', 'status = {}\\ndataset_status = official | active | inactive'.format(status_list))
+    descs['judgements_total'] = ('gauge', 'status = {}\\ndataset_status = live | active | inactive'.format(status_list))
     metrics['judgements_total'] = {}
     for cs, status in judgements_list:
         for c in cs:
-            cname, tname, uname, ds_desc, ds_active, ds_autojudge, count = c
-            ds_status = 'official'
-            if not ds_active:
-                ds_status = 'active' if ds_autojudge else 'inactive'
-            key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ds_desc), ('dataset_status', ds_status), ('status', status))
+            cname, taskname, teamname, uname, ds_desc, ds_live, ds_autojudge, count = c
+            ds_status = get_dataset_status(ds_live, ds_autojudge)
+            key = (('contest', cname), ('task', taskname), ('team', teamname), ('user', uname),
+                ('dataset', ds_desc), ('dataset_status', ds_status), ('status', status))
             metrics['judgements_total'][key] = count
 
-    question_query = sql_session.query(Contest.name, Team.name, User.username, func.count(Question.id))\
+    question_query = sql_session.query(Contest.name, Team.code, User.username, func.count(Question.id))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
         .outerjoin(Team, Team.id == Participation.team_id)\
@@ -161,15 +167,14 @@ def compute_metrics(sql_session):
         for q in qs:
             cname, tname, uname, count = q
             key = (('contest', cname), ('team', tname), ('user', uname), ('status', status))
-            if tname is None:
-                key = (('contest', cname), ('user', uname), ('status', status))
             metrics['questions_total'][key] = count
 
     evals = sql_session.query(
-        Contest.name, Task.name, User.username,
-        Dataset.description, func.coalesce(func.sum(Evaluation.execution_wall_clock_time), 0.0))\
+        Contest.name, Task.name, Team.code, User.username, Dataset.description,
+        Dataset.id == Task.active_dataset_id, Dataset.autojudge, func.coalesce(func.sum(Evaluation.execution_wall_clock_time), 0.0))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
+        .outerjoin(Team, Team.id == Participation.team_id)\
         .join(User, User.id == Participation.user_id)\
         .join(Contest, Contest.id == Participation.contest_id)\
         .join(Submission, Submission.participation_id == Participation.id)\
@@ -178,15 +183,17 @@ def compute_metrics(sql_session):
         .join(Dataset, Dataset.id == SubmissionResult.dataset_id)\
         .join(Evaluation, Evaluation.submission_id == Submission.id)\
         .filter(Evaluation.dataset_id == Dataset.id)\
-        .group_by(Contest.id, Task.id, User.id, Dataset.id)\
+        .group_by(Contest.id, Team.id, User.id, Task.id, Dataset.id)\
         .all()
 
-    descs['wall_clock_time_total'] = ('gauge', None)
+    descs['wall_clock_time_total'] = ('gauge', 'dataset_status = live | active | inactive')
     metrics['wall_clock_time_total'] = {}
 
     for e in evals:
-        cname, tname, uname, ddesc, wtime = e
-        key = (('contest', cname), ('task', tname), ('user', uname), ('dataset', ddesc))
+        cname, taskname, teamname, uname, ddesc, ds_live, ds_autojudge, wtime = e
+        ds_status = get_dataset_status(ds_live, ds_autojudge)
+        key = (('contest', cname), ('task', taskname), ('team', teamname), ('user', uname),
+            ('dataset', ddesc), ('dataset_status', ds_status))
         metrics['wall_clock_time_total'][key] = wtime
 
     return (metrics, descs)
