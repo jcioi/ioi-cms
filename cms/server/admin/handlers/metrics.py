@@ -36,6 +36,8 @@ from cms.db import User, Contest, Task, Submission, Participation, Dataset, Subm
 
 logger = logging.getLogger(__name__)
 
+def filter_none(items):
+    return list(filter(lambda kv: (kv[1] is not None), items))
 
 def compute_metrics(sql_session):
 
@@ -210,12 +212,15 @@ class MetricsHandler(CommonRequestHandler):
                     self.write('# HELP cms_{} {}\n'.format(metric_key, metric_help))
 
             for labels, value in metric_values.items():
-                if labels:
-                    kvs_list = map(lambda kv: '{}="{}"'.format(kv[0], kv[1]), labels)
-                    value_repr = '{:.4f}'.format(value) if type(value) is float else '{}'.format(value)
+
+                value_repr = '{:.4f}'.format(value) if type(value) is float else '{}'.format(value)
+                filtered_labels = None if labels is None else filter_none(labels)
+
+                if filtered_labels:
+                    kvs_list = map(lambda kv: '{}="{}"'.format(kv[0], kv[1]), filtered_labels)
                     self.write('cms_{}{{{}}} {}\n'.format(metric_key, ','.join(kvs_list), value_repr))
                 else:
-                    self.write('cms_{} {}\n'.format(metric_key, value))
+                    self.write('cms_{} {}\n'.format(metric_key, value_repr))
 
             self.write('\n')
 
