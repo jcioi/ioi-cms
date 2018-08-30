@@ -211,7 +211,8 @@ class MetricsHandler(CommonRequestHandler):
             for labels, value in metric_values.items():
                 if labels:
                     kvs_list = map(lambda kv: '{}="{}"'.format(kv[0], kv[1]), labels)
-                    self.write('cms_{}{{{}}} {}\n'.format(metric_key, ','.join(kvs_list), value))
+                    value_repr = '{:.4f}'.format(value) if type(value) is float else '{}'.format(value)
+                    self.write('cms_{}{{{}}} {}\n'.format(metric_key, ','.join(kvs_list), value_repr))
                 else:
                     self.write('cms_{} {}\n'.format(metric_key, value))
 
