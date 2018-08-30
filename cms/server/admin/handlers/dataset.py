@@ -100,7 +100,7 @@ class CloneDatasetHandler(BaseHandler):
         try:
             original_dataset = \
                 self.safe_get_item(Dataset, dataset_id_to_copy)
-            description = "Copy of %s" % original_dataset.description
+            description = "copy_of_%s" % original_dataset.description
         except ValueError:
             raise tornado.web.HTTPError(404)
 
