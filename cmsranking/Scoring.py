@@ -79,7 +79,7 @@ class Score(object):
     # but cms assures that the order in which the subchanges have to
     # be processed is the ascending order of their keys (actually,
     # this is enforced only for subchanges with the same time).
-    def __init__(self, score_mode="max_tokened_last"):
+    def __init__(self, score_mode, score_precision):
         # The submissions in their current status.
         self._submissions = dict()
 
@@ -97,6 +97,7 @@ class Score(object):
         self._history = list()
 
         self._score_mode = score_mode
+        self._score_precision = score_precision
 
     def append_change(self, change):
         # Remove from released submission (if needed), apply changes,
@@ -137,6 +138,9 @@ class Score(object):
                 for idx, sc in enumerate(s.subtask_scores):
                     max_scores[idx] = max(max_scores[idx], sc)
             score = sum(max_scores)
+
+        # FIXME(wafrelka): adhoc fix
+        score = round(score, self._score_precision)
 
         if score != self.get_score():
             self._history.append((change.time, score))
@@ -300,7 +304,7 @@ class ScoringStore(object):
         if submission.task not in self._scores[submission.user]:
             task = self.task_store.retrieve(submission.task)
             self._scores[submission.user][submission.task] = \
-                Score(score_mode=task["score_mode"])
+                Score(score_mode=task["score_mode"], score_precision=task["score_precision"])
 
         score_obj = self._scores[submission.user][submission.task]
         old_score = score_obj.get_score()
