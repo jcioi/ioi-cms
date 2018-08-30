@@ -164,7 +164,7 @@ def compute_metrics(sql_session):
 
     evals = sql_session.query(
         Contest.name, Task.name, User.username,
-        Dataset.description, func.sum(Evaluation.execution_wall_clock_time))\
+        Dataset.description, func.coalesce(func.sum(Evaluation.execution_wall_clock_time), 0.0))\
         .select_from(Participation)\
         .filter(not_(Participation.hidden))\
         .join(User, User.id == Participation.user_id)\
