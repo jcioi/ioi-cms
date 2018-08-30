@@ -25,6 +25,7 @@ from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 
 import logging
+import traceback
 
 from sqlalchemy import func, not_
 
@@ -197,7 +198,7 @@ class MetricsHandler(CommonRequestHandler):
         try:
             metrics, descs = compute_metrics(self.sql_session)
         except Exception as err:
-            logger.error(err)
+            logger.error(traceback.format_exc())
             return
 
         for metric_key, metric_values in metrics.items():
