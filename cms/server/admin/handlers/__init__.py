@@ -108,6 +108,8 @@ from .submission import \
 from .usertest import \
     UserTestHandler, \
     UserTestFileHandler
+from .metrics import \
+    MetricsHandler
 
 
 HANDLERS = [
@@ -120,6 +122,7 @@ HANDLERS = [
     (r"/resources/([0-9]+|all)/([0-9]+)", ResourcesHandler),
     (r"/notifications", NotificationsHandler),
     (r"/file/([a-f0-9]+)/([a-zA-Z0-9_.-]+)", FileFromDigestHandler),
+    (r"/metrics", MetricsHandler),
 
     # Contest
 
