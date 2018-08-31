@@ -43,7 +43,7 @@ def get_dataset_status(is_live, autojudge):
         return 'live'
     return 'active' if autojudge else 'inactive'
 
-def compute_metrics(sql_session):
+def compute_contest_metrics(sql_session):
 
     metrics = {}
     descs = {}
@@ -198,37 +198,76 @@ def compute_metrics(sql_session):
 
     return (metrics, descs)
 
-class MetricsHandler(CommonRequestHandler):
+def compute_system_metrics(evaluation_service):
+
+    metrics = {}
+    descs = {}
+
+    workers_status = evaluation_service.workers_status().get()
+    connected_workers = len(list(filter(lambda st: st['connected'], workers_status.values())))
+    total_workers = len(workers_status)
+
+    descs['workers_total'] = ('gauge', 'status = connected | disconnected')
+    metrics['workers_total'] = {
+        (('status', 'connected'),): connected_workers,
+        (('status', 'disconnected'),): total_workers - connected_workers,
+    }
+
+    return (metrics, descs)
+
+def format_metrics_data(metrics, descs):
+
+    lines = []
+
+    for metric_key, metric_values in metrics.items():
+
+        if metric_key in descs:
+            metric_type, metric_help = descs[metric_key]
+            lines.append('# TYPE cms_{} {}'.format(metric_key, metric_type))
+            if metric_help is not None:
+                lines.append('# HELP cms_{} {}'.format(metric_key, metric_help))
+
+        for labels, value in metric_values.items():
+
+            value_repr = '{:.4f}'.format(value) if type(value) is float else '{}'.format(value)
+            filtered_labels = None if labels is None else filter_none(labels)
+
+            if filtered_labels:
+                kvs_list = map(lambda kv: '{}="{}"'.format(kv[0], kv[1]), filtered_labels)
+                lines.append('cms_{}{{{}}} {}'.format(metric_key, ','.join(kvs_list), value_repr))
+            else:
+                lines.append('cms_{} {}'.format(metric_key, value_repr))
+
+        lines.append('')
+
+    return lines
+
+class ContestMetricsHandler(CommonRequestHandler):
 
     def get(self):
 
-        metrics, descs = None, None
+        try:
+
+            metrics, descs = compute_contest_metrics(self.sql_session)
+            text = format_metrics_data(metrics, descs)
+            self.write('\n'.join(text + ['']))
+            self.set_header('Content-Type', 'text/plain')
+
+        except Exception as err:
+
+            logger.error(traceback.format_exc())
+
+class SystemMetricsHandler(CommonRequestHandler):
+
+    def get(self):
 
         try:
-            metrics, descs = compute_metrics(self.sql_session)
+
+            metrics, descs = compute_system_metrics(self.service.evaluation_service)
+            text = format_metrics_data(metrics, descs)
+            self.write('\n'.join(text + ['']))
+            self.set_header('Content-Type', 'text/plain')
+
         except Exception as err:
+
             logger.error(traceback.format_exc())
-            return
-
-        for metric_key, metric_values in metrics.items():
-
-            if metric_key in descs:
-                metric_type, metric_help = descs[metric_key]
-                self.write('# TYPE cms_{} {}\n'.format(metric_key, metric_type))
-                if metric_help is not None:
-                    self.write('# HELP cms_{} {}\n'.format(metric_key, metric_help))
-
-            for labels, value in metric_values.items():
-
-                value_repr = '{:.4f}'.format(value) if type(value) is float else '{}'.format(value)
-                filtered_labels = None if labels is None else filter_none(labels)
-
-                if filtered_labels:
-                    kvs_list = map(lambda kv: '{}="{}"'.format(kv[0], kv[1]), filtered_labels)
-                    self.write('cms_{}{{{}}} {}\n'.format(metric_key, ','.join(kvs_list), value_repr))
-                else:
-                    self.write('cms_{} {}\n'.format(metric_key, value_repr))
-
-            self.write('\n')
-
-        self.set_header('Content-Type', 'text/plain')
