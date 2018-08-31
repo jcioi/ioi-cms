@@ -198,12 +198,12 @@ def compute_contest_metrics(sql_session):
 
     return (metrics, descs)
 
-def compute_system_metrics(evaluation_service):
+def compute_system_metrics(service):
 
     metrics = {}
     descs = {}
 
-    workers_status = evaluation_service.workers_status().get()
+    workers_status = service.evaluation_service.workers_status().get()
     connected_workers = len(list(filter(lambda st: st['connected'], workers_status.values())))
     total_workers = len(workers_status)
 
@@ -212,6 +212,16 @@ def compute_system_metrics(evaluation_service):
         (('status', 'connected'),): connected_workers,
         (('status', 'disconnected'),): total_workers - connected_workers,
     }
+
+    msgs = service.logservice.last_messages().get()
+    severity_keys = ['warning', 'error', 'critical']
+
+    descs['latest_log_entries_total'] = ('gauge', 'severity = {}'.format(' | '.join(severity_keys)))
+    metrics['latest_log_entries_total'] = {}
+    for key in severity_keys:
+        key_cap = key.upper()
+        count = len(list(filter(lambda m: m['severity'] == key_cap, msgs)))
+        metrics['latest_log_entries_total'][(('window',100), ('severity', key))] = count
 
     return (metrics, descs)
 
@@ -263,7 +273,7 @@ class SystemMetricsHandler(CommonRequestHandler):
 
         try:
 
-            metrics, descs = compute_system_metrics(self.service.evaluation_service)
+            metrics, descs = compute_system_metrics(self.service)
             text = format_metrics_data(metrics, descs)
             self.write('\n'.join(text + ['']))
             self.set_header('Content-Type', 'text/plain')
