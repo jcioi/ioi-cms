@@ -38,8 +38,9 @@ import os
 import sys
 
 from cms import utf8_decoder
-from cms.db import Dataset, File, FSObject, Participation, SessionGen, \
+from cms.db import Dataset, File, Participation, SessionGen, \
     Submission, SubmissionResult, Task, User
+from cms.db.filecacher import FileCacher
 from cms.grading import languagemanager
 
 
@@ -134,6 +135,7 @@ def main():
                              "  time: submission timestamp\n"
                              "  user: username\n"
                              "  task: taskname\n"
+                             "  score: raw score\n"
                              " (default: {id}.{file}{ext})",
                         default="{id}.{file}{ext}")
     parser.add_argument("output_dir", action="store", type=utf8_decoder,
@@ -149,16 +151,13 @@ def main():
 
     args = parser.parse_args()
 
-    if args.add_info and not args.utf8:
-        logger.critical("If --add-info is specified, then --utf8 must be"
-                        " specified as well.")
-        return 1
-
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
     if not os.path.isdir(args.output_dir):
         logger.critical("The output-dir parameter must point to a directory")
         return 1
+
+    cacher = FileCacher()
 
     with SessionGen() as session:
         q = session.query(Submission)\
@@ -217,7 +216,8 @@ def main():
                                             name=filename_base,
                                             ext=filename_ext,
                                             time=timef, user=u_name,
-                                            task=t_name)
+                                            task=t_name,
+                                            score=sr_score)
             filename = os.path.join(args.output_dir, filename)
             if os.path.exists(filename):
                 logger.warning("Skipping file '%s' because it already exists",
@@ -230,37 +230,40 @@ def main():
                 logger.warning("%s is not a directory, skipped.", filedir)
                 continue
 
-            fso = FSObject.get_from_digest(f_digest, session)
-            assert fso is not None
-            with fso.get_lobject(mode="rb") as file_obj:
-                data = file_obj.read()
+            if not (args.utf8 or args.add_info):
+
+                cacher.get_file_to_path(f_digest, filename)
+
+            else:
+
+                content_bytes = cacher.get_file_content(f_digest)
 
                 if args.utf8:
                     try:
-                        data = utf8_decoder(data)
+                        content = utf8_decoder(content_bytes)
+                        content_bytes = content.encode("utf-8")
                     except TypeError:
                         logger.critical("Could not guess encoding of file "
                                         "'%s'. Aborting.",
                                         filename)
-                        sys.exit(1)
+                        return 1
 
-                    if args.add_info:
-                        data = TEMPLATE[ext] % (
-                            u_name,
-                            u_fname,
-                            u_lname,
-                            t_name,
-                            sr_score,
-                            s_timestamp
-                        ) + data
+                if args.add_info:
 
-                    # Print utf8-encoded, possibly altered data
-                    with io.open(filename, "wt", encoding="utf-8") as f_out:
-                        f_out.write(data)
-                else:
-                    # Print raw, untouched binary data
-                    with io.open(filename, "wb") as f_out:
-                        f_out.write(data)
+                    template_str = TEMPLATE[ext] % (
+                        u_name,
+                        u_fname,
+                        u_lname,
+                        t_name,
+                        sr_score,
+                        s_timestamp
+                    )
+                    template_bytes = template_str.encode("utf-8")
+
+                    content_bytes = template_bytes + content_bytes
+
+                with io.open(filename, 'wb') as f_out:
+                    f_out.write(content_bytes)
 
             done += 1
             print(done, "/", len(results))
