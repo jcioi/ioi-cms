@@ -140,6 +140,8 @@ def main():
                         default="{id}.{file}{ext}")
     parser.add_argument("output_dir", action="store", type=utf8_decoder,
                         help="directory where to save the submissions")
+    parser.add_argument("-y", "--yes", action="store_true",
+                        help="if set, confirmation will not be shown")
 
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--unique", action="store_true",
@@ -195,7 +197,7 @@ def main():
             results = filter_top_scoring(results, args.unique)
 
         print("%s file(s) will be created." % len(results))
-        if input("Continue? [Y/n] ").strip().lower() not in ["y", ""]:
+        if not args.yes and (input("Continue? [Y/n] ").strip().lower() not in ["y", ""]):
             return 0
 
         done = 0
