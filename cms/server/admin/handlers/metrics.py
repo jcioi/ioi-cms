@@ -204,14 +204,30 @@ def compute_system_metrics(service):
     descs = {}
 
     workers_status = service.evaluation_service.workers_status().get()
-    connected_workers = len(list(filter(lambda st: st['connected'], workers_status.values())))
-    total_workers = len(workers_status)
 
-    descs['workers_total'] = ('gauge', 'status = connected | disconnected')
-    metrics['workers_total'] = {
-        (('status', 'connected'),): connected_workers,
-        (('status', 'disconnected'),): total_workers - connected_workers,
-    }
+    descs['workers_total'] = ('gauge', 'connection = connected | disconnected\\noperation = enabled | disabled')
+    metrics['workers_total'] = {}
+
+    connection_status = ['connected', 'disconnected']
+    operation_status = ['enabled', 'disabled']
+
+    for conn in connection_status:
+        for op in operation_status:
+
+            workers = workers_status.values()
+
+            if conn == 'connected':
+                workers = filter(lambda st: st['connected'], workers)
+            else:
+                workers = filter(lambda st: not st['connected'], workers)
+            if op == 'enabled':
+                workers = filter(lambda st: st['operations'] != 'disabled', workers)
+            else:
+                workers = filter(lambda st: st['operations'] == 'disabled', workers)
+
+            count = len(list(workers))
+            key = (('connection', conn), ('operation', op))
+            metrics['workers_total'][key] = count
 
     msgs = service.logservice.last_messages().get()
     severity_keys = ['warning', 'error', 'critical']
