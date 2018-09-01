@@ -387,7 +387,7 @@ class Dataset(Base):
     # A human-readable text describing the dataset.
     description = Column(
         Unicode,
-        CodenameConstraint("name"),
+        CodenameConstraint("description"),
         nullable=False)
 
     # Whether this dataset will be automatically judged by ES and SS
