@@ -67,11 +67,12 @@ class UnacceptableQuestion(Exception):
         self.text = text
 
 
-def question_webhook(url, subject, text):
+def question_webhook(url, participation, subject, text):
     """Post a question to the webhook url."""
 
+    user = participation.user.username
     data = {
-        'text': 'New Question Received',
+        'text': 'New Question Received from {}'.format(user),
         'attachments': [
             {
                 "title": subject,
