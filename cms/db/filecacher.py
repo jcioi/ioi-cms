@@ -507,6 +507,8 @@ class S3Backend(FileCacherBackend):
         self.base_url_for_fetch = base_url_for_fetch
         if self.base_url_for_fetch:
             self.http = requests.Session()
+        else:
+            self.http = None
 
     def _s3_key(self, digest):
         return "%s%s/%s" % (self.prefix, digest[0:2], digest)
