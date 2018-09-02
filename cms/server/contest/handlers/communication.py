@@ -82,6 +82,7 @@ class QuestionHandler(ContestHandler):
             if hasattr(config, 'question_hook_urls'):
                 for url in config.question_hook_urls:
                     question_webhook(url,
+                                     self.current_user,
                                      self.get_argument("question_subject", ""),
                                      self.get_argument("question_text", ""))
         except QuestionsNotAllowed:
