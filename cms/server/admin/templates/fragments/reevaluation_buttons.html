@@ -72,4 +72,17 @@ contest_id (int|None): the id of the contest to invalidate.
         disabled
 {% endif %}
         title="Score" >S</button>
+<button onclick="window.confirm('Requeue submission(s)?') && cmsrpc_request(
+                  'EvaluationService', 0,
+                  'invalidate_submission', {
+{% for key, value in iteritems(invalidate_arguments) %}
+                  '{{ key }}': {{ value }},
+{% endfor %}
+                  'level': 'requeue'},
+                  function(response) { utils.redirect_if_ok('{{ next_page }}', response); }
+                  );"
+{% if not admin.permission_all %}
+        disabled
+{% endif %}
+        title="Requeue" >Q</button>
 {% endmacro %}
