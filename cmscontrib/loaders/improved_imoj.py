@@ -195,6 +195,10 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
 
         participations = []
 
+        conf.setdefault('users', [])
+        conf.setdefault('tasks', [])
+        conf.setdefault('task_names', [])
+
         for u in conf['users']:
             p = {}
             assign(p, u, 'username')
@@ -204,7 +208,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
             try_assign(p, u, 'password', build_password)
             participations.append(p)
 
-        tasks = []
+        tasks = conf['task_names'].copy()
 
         for t in conf['tasks']:
             task_path = os.path.join(base_path, t)
