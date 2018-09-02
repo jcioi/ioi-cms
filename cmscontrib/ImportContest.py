@@ -199,13 +199,22 @@ class ContestImporter(object):
             - if the task is already in the DB, attached to another contest.
 
         """
+
+        task = session.query(Task).filter(Task.name == taskname).first()
+
+        # FIXME(wafrelka): Adhoc fix
+        if (task is not None) and (not self.update_tasks):
+            task.num = tasknum
+            task.contest = contest
+            return task
+        if task is None:
+            logger.info("loading task \"{}\" since it does not exist in the DB".format(taskname))
+
         task_loader = self.loader.get_task_loader(taskname)
 
         if task_loader is None:
             raise ImportDataError(
                 "Could not import task \"%s\"." % taskname)
-
-        task = session.query(Task).filter(Task.name == taskname).first()
 
         if task is None:
             # Task is not in the DB; if the user asked us to import it, we do
