@@ -586,13 +586,19 @@ class SubmissionResult(Base):
         self.executables = {}
 
     def invalidate_evaluation(self):
-        """Blank the evaluation outcomes and the score.
+        """Blank the evaluation outcome, all evaluations, and the score.
+
+        """
+        self.invalidate_evaluation_result()
+        self.evaluations = []
+
+    def invalidate_evaluation_result(self):
+        """Blank the evaluation outcome and the score.
 
         """
         self.invalidate_score()
         self.evaluation_outcome = None
         self.evaluation_tries = 0
-        self.evaluations = []
 
     def invalidate_score(self):
         """Blank the score.

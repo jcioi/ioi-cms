@@ -883,14 +883,14 @@ class EvaluationService(TriggeredService):
         participation_id (int|None): id of the participation to
             invalidate, or None.
         task_id (int|None): id of the task to invalidate, or None.
-        level (string): 'compilation' or 'evaluation'
+        level (string): 'compilation' or 'evaluation' or 'requeue'
 
         """
         logger.info("Invalidation request received.")
 
         # Validate arguments
         # TODO Check that all these objects belong to this contest.
-        if level not in ("compilation", "evaluation"):
+        if level not in ("compilation", "evaluation", "requeue"):
             raise ValueError(
                 "Unexpected invalidation level `%s'." % level)
 
@@ -953,6 +953,8 @@ class EvaluationService(TriggeredService):
                     submission_result.invalidate_compilation()
                 elif level == "evaluation":
                     submission_result.invalidate_evaluation()
+                elif level == "requeue":
+                    submission_result.invalidate_evaluation_result()
 
             # Finally, we re-enqueue the operations for the
             # submissions.
