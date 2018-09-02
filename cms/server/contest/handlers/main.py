@@ -255,7 +255,7 @@ class StatsHandler(ContestHandler):
             return score_sum / contest_total
 
         stats = [
-            { 'name': t['name'], 'ratio': compute_ratio(t['total']) }
+            { 'name': t['name'], 'ratio': round(compute_ratio(t['total']), 2) }
             for t in score_list
         ]
         stats_text = json.dumps({'tasks_by_score_rel': stats})

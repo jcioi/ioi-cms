@@ -21,7 +21,10 @@ from .base_loader import ContestLoader, TaskLoader, UserLoader
 
 AUTO_COMPILATION_CMD = ['g++', '--std=c++14', '-O2', '-Wall']
 ENVVAR_NAME_DEFAULT_CONF_PATH = 'CMS_DEFAULT_TASK_CONF_PATH'
-DEFAULT_CONF_PATH = os.path.join('..', 'default-task-iif.yaml')
+DEFAULT_CONF_PATHS = [
+    os.path.join('..', 'default-task-iif.yaml'),
+    os.path.join('default-task-iif.yaml'),
+]
 
 logger = logging.getLogger(__name__)
 
@@ -301,15 +304,25 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         logger.info("loading parameters for task \"%s\"", name)
 
         # inherited default
-        default_conf_path_x = os.path.join(base_path, DEFAULT_CONF_PATH)
-        default_conf_path = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH, default_conf_path_x)
-        if exists(default_conf_path):
-            default_conf = load_yaml(default_conf_path)
-            default_assign(conf, default_conf, 'primary_language')
-            default_assign(conf, default_conf, 'max_submission_number')
-            default_assign(conf, default_conf, 'min_submission_interval')
-        else:
-            logging.warning("cannot find default config file")
+        default_conf_paths = DEFAULT_CONF_PATHS.copy()
+        env_default_conf_path = os.environ.get(ENVVAR_NAME_DEFAULT_CONF_PATH)
+        if env_default_conf_path is not None:
+            default_conf_paths = [env_default_conf_path]
+
+        default_found = False
+
+        for def_path in default_conf_paths:
+            if exists(def_path):
+                default_conf = load_yaml(def_path)
+                default_assign(conf, default_conf, 'primary_language')
+                default_assign(conf, default_conf, 'max_submission_number')
+                default_assign(conf, default_conf, 'min_submission_interval')
+                default_found = True
+                break
+
+        if not default_found:
+            search_paths = ', '.join(default_conf_paths)
+            logging.warning("cannot find default config file (search path: {})".format(search_paths))
 
         # default
         conf.setdefault('score_mode', SCORE_MODE_MAX_SUBTASK)
