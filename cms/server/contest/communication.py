@@ -72,11 +72,12 @@ def question_webhook(url, participation, subject, text):
 
     user = participation.user.username
     data = {
-        'text': 'New Question Received from {}'.format(user),
+        'text': 'New Question Received',
         'attachments': [
             {
                 "title": subject,
                 "text": text,
+                "footer": "Send from {}".format(user)
             }
         ]
     }
