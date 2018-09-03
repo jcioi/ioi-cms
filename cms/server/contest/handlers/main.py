@@ -41,7 +41,7 @@ import json
 import logging
 
 import tornado.web
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy.orm import joinedload
 import redis
 
 from cms import config
@@ -226,10 +226,10 @@ class StatsHandler(ContestHandler):
 
         contest = self.sql_session.query(Contest)\
             .filter(Contest.id == self.contest.id)\
-            .options(subqueryload('participations'))\
-            .options(subqueryload('participations.submissions'))\
-            .options(subqueryload('participations.submissions.token'))\
-            .options(subqueryload('participations.submissions.results'))\
+            .options(joinedload('participations'))\
+            .options(joinedload('participations.submissions'))\
+            .options(joinedload('participations.submissions.token'))\
+            .options(joinedload('participations.submissions.results'))\
             .first()
 
         score_list = []
