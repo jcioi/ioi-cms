@@ -40,7 +40,7 @@ import io
 
 from sqlalchemy.orm import subqueryload
 
-from cms.db import Contest, Participation
+from cms.db import Contest, Task, Participation, Submission
 from cms.grading import task_score
 
 from .base import BaseHandler, require_permission
@@ -57,14 +57,14 @@ class RankingHandler(BaseHandler):
 
         participations = self.sql_session.query(Participation)\
             .filter(Participation.contest_id == contest_id)\
-            .options(subqueryload("submissions"))\
-            .options(subqueryload("submissions.token"))\
-            .options(subqueryload("submissions.results"))\
-            .all()
+            .option(subqueryload(Submission))\
+            .option(subqueryload(Submission.token))\
+            .option(subqueryload(Submission.results))\
+            .first()
 
         self.contest = self.sql_session.query(Contest)\
             .filter(Contest.id == contest_id)\
-            .options(subqueryload("tasks"))\
+            .option(subqueryload(Task))\
             .first()
 
         # Preprocess participations: get data about teams, scores
