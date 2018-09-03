@@ -77,7 +77,7 @@ def load_participations(path):
 
             if 'plaintext_password' in userdata:
                 logger.info('  * password')
-                user.first_name = build_password(userdata['plaintext_password'], 'plaintext')
+                user.password = build_password(userdata['plaintext_password'], 'plaintext')
 
             if 'first_name' in userdata:
                 logger.info('  * first_name: %s' % (userdata['first_name']))
