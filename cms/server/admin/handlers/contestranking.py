@@ -38,7 +38,7 @@ import six
 import csv
 import io
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import subqueryload
 
 from cms.db import Contest
 from cms.grading import task_score
@@ -59,10 +59,10 @@ class RankingHandler(BaseHandler):
         # to generating the rankings.
         self.contest = self.sql_session.query(Contest)\
             .filter(Contest.id == contest_id)\
-            .options(joinedload('participations'))\
-            .options(joinedload('participations.submissions'))\
-            .options(joinedload('participations.submissions.token'))\
-            .options(joinedload('participations.submissions.results'))\
+            .options(subqueryload('participations'))\
+            .options(subqueryload('participations.submissions'))\
+            .options(subqueryload('participations.submissions.token'))\
+            .options(subqueryload('participations.submissions.results'))\
             .first()
 
         # Preprocess participations: get data about teams, scores
