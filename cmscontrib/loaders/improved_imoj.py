@@ -44,7 +44,7 @@ def glob_to_regexp(g):
     return g
 def globlist_to_text(gs):
     rs = ['(' + glob_to_regexp(g) + ')' for g in gs]
-    return '\A' + '|'.join(rs) + '\Z'
+    return '\A(' + '|'.join(rs) + ')\Z'
 def globlist_to_regexp(gs):
     return re.compile(globlist_to_text(gs))
 
