@@ -106,14 +106,16 @@ var Overview = new function () {
     /** SCORE & RANK AXIS */
 
     self.update_score_axis = function () {
-        var d = Raphael.format("M {1},{3} L {1},{7} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6}",
+        var d = Raphael.format("M {1},{3} L {1},{9} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6} M {0},{7} L {2},{7} M {0},{8} L {2},{8}",
                                self.PAD_L - 4,
                                self.PAD_L,
                                self.PAD_L + 4,
                                self.PAD_T,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.25,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.50,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.75,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 3,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 4,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
 
         if (self.score_axis) {
@@ -126,21 +128,42 @@ var Overview = new function () {
 
 
     self.update_rank_axis = function () {
-        var d = Raphael.format("M {1},{3} L {1},{7} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6}",
+        var d = Raphael.format("M {1},{3} L {1},{9} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6} M {0},{7} L {2},{7} M {0},{8} L {2},{8}",
                                self.width - self.PAD_R - 4,
                                self.width - self.PAD_R,
                                self.width - self.PAD_R + 4,
                                self.PAD_T,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 12,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 4,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 3,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 4,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
+
+        var ranks = [
+            { color: "gold", ratio: 1/12 },
+            { color: "silver", ratio: 2/12 },
+            { color: "#cd7f32", ratio: 3/12 },
+            { color: "#000000", ratio: 6/12 }
+        ];
+        var stops = [];
+        var base = 0;
+        ranks.forEach((rank) => {
+            stops.push(rank.color + ":" + (base + (rank.ratio / 3)) * 100);
+            stops.push(rank.color + ":" + (base + (rank.ratio / 3 * 2)) * 100);
+            base += rank.ratio;
+        });
+        stops = stops.join("-");
 
         if (self.rank_axis) {
             self.rank_axis.attr("path", d);
         } else {
             self.rank_axis = self.paper.path(d).attr(
-                {"fill": "none", "stroke": "#b8b8b8", "stroke-width": 3, "stroke-linecap": "round"});
+                {"fill": "270-" + stops, "stroke": "#b8b8b8", "stroke-width": 3, "stroke-linecap": "round"});
+            // since raphael does not support gradietion for stroke, copy value from fill attr
+            self.rank_axis.node.setAttribute("stroke", self.rank_axis.node.getAttribute("fill"));
+            self.rank_axis.node.setAttribute("fill", "none");
+
         }
     };
 

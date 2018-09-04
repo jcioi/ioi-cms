@@ -555,8 +555,8 @@ class SubmissionResult(Base):
 
         """
         return all(getattr(self, k) is not None for k in [
-            "score", "score_details",
-            "public_score", "public_score_details",
+            "score", "subtask_scores",
+            "public_score", "public_subtask_scores",
             "ranking_score_details"])
 
     @staticmethod

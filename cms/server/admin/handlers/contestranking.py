@@ -38,13 +38,15 @@ import six
 import csv
 import io
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, subqueryload, defer
 
 from cms.db import Contest
 from cms.grading import task_score
 
 from .base import BaseHandler, require_permission
 
+import logging
+logger = logging.getLogger(__name__)
 
 class RankingHandler(BaseHandler):
     """Shows the ranking for a contest.
@@ -55,19 +57,26 @@ class RankingHandler(BaseHandler):
         # This validates the contest id.
         self.safe_get_item(Contest, contest_id)
 
+        logger.debug("ranking computation: start")
+
         # This massive joined load gets all the information which we will need
         # to generating the rankings.
         self.contest = self.sql_session.query(Contest)\
             .filter(Contest.id == contest_id)\
-            .options(joinedload('participations'))\
-            .options(joinedload('participations.submissions'))\
-            .options(joinedload('participations.submissions.token'))\
-            .options(joinedload('participations.submissions.results'))\
+            .options(subqueryload('participations'))\
+            .options(subqueryload('participations.submissions'))\
+            .options(subqueryload('participations.submissions.token'))\
+            .options(subqueryload('participations.submissions.results'))\
+            .options(defer('participations.submissions.results.score_details'))\
+            .options(defer('participations.submissions.results.public_score_details'))\
             .first()
+
+        logger.debug("ranking computation: data load completed")
 
         # Preprocess participations: get data about teams, scores
         show_teams = False
         for p in self.contest.participations:
+
             show_teams = show_teams or p.team_id
 
             p.scores = []
@@ -81,6 +90,8 @@ class RankingHandler(BaseHandler):
                 partial = partial or t_partial
             total_score = round(total_score, self.contest.score_precision)
             p.total_score = (total_score, partial)
+
+        logger.debug("ranking computation: completed")
 
         self.r_params = self.render_params()
         self.r_params["show_teams"] = show_teams
