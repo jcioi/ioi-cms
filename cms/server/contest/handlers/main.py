@@ -41,7 +41,7 @@ import json
 import logging
 
 import tornado.web
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy.orm import joinedload, subqueryload, defer
 import redis
 
 from cms import config
@@ -230,6 +230,8 @@ class StatsHandler(ContestHandler):
             .options(subqueryload('participations.submissions'))\
             .options(subqueryload('participations.submissions.token'))\
             .options(subqueryload('participations.submissions.results'))\
+            .options(defer('participations.submissions.results.score_details'))\
+            .options(defer('participations.submissions.results.public_score_details'))\
             .first()
 
         score_list = []

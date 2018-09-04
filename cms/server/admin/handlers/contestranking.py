@@ -38,7 +38,7 @@ import six
 import csv
 import io
 
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy.orm import joinedload, subqueryload, defer
 
 from cms.db import Contest
 from cms.grading import task_score
@@ -67,6 +67,8 @@ class RankingHandler(BaseHandler):
             .options(subqueryload('participations.submissions'))\
             .options(subqueryload('participations.submissions.token'))\
             .options(subqueryload('participations.submissions.results'))\
+            .options(defer('participations.submissions.results.score_details'))\
+            .options(defer('participations.submissions.results.public_score_details'))\
             .first()
 
         logger.debug("ranking computation: data load completed")
