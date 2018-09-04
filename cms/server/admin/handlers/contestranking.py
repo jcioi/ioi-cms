@@ -75,7 +75,6 @@ class RankingHandler(BaseHandler):
         show_teams = False
         for p in self.contest.participations:
 
-            logger.debug("ranking computation: user_id = {}".format(p.user_id))
             show_teams = show_teams or p.team_id
 
             p.scores = []
