@@ -139,16 +139,21 @@ var Overview = new function () {
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 4,
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
-        var stops = [
-            "gold:2.78",
-            "gold:5.56",
-            "silver:13.89",
-            "silver:19.44",
-            "#cd7f32:33.33",
-            "#cd7f32:41.67",
-            "#000000:66.66",
-            "#000000:83.32",
-        ].join("-");
+	
+        var ranks = [
+	    { color: "gold", ratio: 1/12 },
+	    { color: "silver", ratio: 2/12 },
+	    { color: "#cd7f32", ratio: 3/12 },
+	    { color: "#000000", ratio: 6/12 }
+	];
+	var stops = [];
+	var base = 0;
+	ranks.forEach((rank) => {
+            stops.push(rank.color + ":" + (base + (rank / 3)) * 100);
+            stops.push(rank.color + ":" + (base + (rank / 3 * 2)) * 100);
+            base += rank.range;
+        });
+	stops = stops.join("-");
 
         if (self.rank_axis) {
             self.rank_axis.attr("path", d);
