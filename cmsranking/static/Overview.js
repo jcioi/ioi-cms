@@ -140,10 +140,14 @@ var Overview = new function () {
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
         var stops = [
-            "gold:4.15",
-            "silver:12.5",
-            "#cd7f32:25",
-            "#000000:100",
+            "gold:2.78",
+            "gold:5.56",
+            "silver:13.89",
+            "silver:19.44",
+            "#cd7f32:33.33",
+            "#cd7f32:41.67",
+            "#000000:66.66",
+            "#000000:83.32",
         ].join("-");
 
         if (self.rank_axis) {
