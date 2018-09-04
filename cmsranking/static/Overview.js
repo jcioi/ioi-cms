@@ -106,14 +106,16 @@ var Overview = new function () {
     /** SCORE & RANK AXIS */
 
     self.update_score_axis = function () {
-        var d = Raphael.format("M {1},{3} L {1},{7} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6}",
+        var d = Raphael.format("M {1},{3} L {1},{9} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6} M {0},{7} L {2},{7} M {0},{8} L {2},{8}",
                                self.PAD_L - 4,
                                self.PAD_L,
                                self.PAD_L + 4,
                                self.PAD_T,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.25,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.50,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) * 0.75,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 3,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 4,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
 
         if (self.score_axis) {
@@ -126,7 +128,7 @@ var Overview = new function () {
 
 
     self.update_rank_axis = function () {
-        var d = Raphael.format("M {1},{3} L {1},{7} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6}",
+        var d = Raphael.format("M {1},{3} L {1},{9} M {0},{4} L {2},{4} M {0},{5} L {2},{5} M {0},{6} L {2},{6} M {0},{7} L {2},{7} M {0},{8} L {2},{8}",
                                self.width - self.PAD_R - 4,
                                self.width - self.PAD_R,
                                self.width - self.PAD_R + 4,
@@ -134,11 +136,14 @@ var Overview = new function () {
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6,
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 2,
                                self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 3,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 4,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 5,
                                self.height - self.PAD_B);
         var stops = [
-            "gold:16.6",
-            "silver:33.3",
-            "#cd7f32:50",
+            "gold:4.15",
+            "silver:12.5",
+            "#cd7f32:25",
+            "#000000:100",
         ].join("-");
 
         if (self.rank_axis) {
