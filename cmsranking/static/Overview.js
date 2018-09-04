@@ -149,9 +149,9 @@ var Overview = new function () {
         var stops = [];
         var base = 0;
         ranks.forEach((rank) => {
-            stops.push(rank.color + ":" + (base + (rank / 3)) * 100);
-            stops.push(rank.color + ":" + (base + (rank / 3 * 2)) * 100);
-            base += rank.range;
+            stops.push(rank.color + ":" + (base + (rank.ratio / 3)) * 100);
+            stops.push(rank.color + ":" + (base + (rank.ratio / 3 * 2)) * 100);
+            base += rank.ratio;
         });
         stops = stops.join("-");
 
