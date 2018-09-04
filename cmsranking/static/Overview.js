@@ -131,16 +131,25 @@ var Overview = new function () {
                                self.width - self.PAD_R,
                                self.width - self.PAD_R + 4,
                                self.PAD_T,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 12,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 4,
-                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 2,
+                               self.PAD_T + (self.height - self.PAD_T - self.PAD_B) / 6 * 3,
                                self.height - self.PAD_B);
+        var stops = [
+            "gold:16.6",
+            "silver:33.3",
+            "#cd7f32:50",
+        ].join("-");
 
         if (self.rank_axis) {
             self.rank_axis.attr("path", d);
         } else {
             self.rank_axis = self.paper.path(d).attr(
-                {"fill": "none", "stroke": "#b8b8b8", "stroke-width": 3, "stroke-linecap": "round"});
+                {"fill": "270-" + stops, "stroke": "#b8b8b8", "stroke-width": 3, "stroke-linecap": "round"});
+            // since raphael does not support gradietion for stroke, copy value from fill attr
+            self.rank_axis.node.setAttribute("stroke", self.rank_axis.node.getAttribute("fill"));
+            self.rank_axis.node.setAttribute("fill", "none");
+
         }
     };
 
