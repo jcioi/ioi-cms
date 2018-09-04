@@ -77,7 +77,7 @@ def load_participations(path):
 
             if 'plaintext_password' in userdata:
                 logger.info('  * password')
-                user.first_name = build_password(userdata['plaintext_password'], 'plaintext')
+                user.password = build_password(userdata['plaintext_password'], 'plaintext')
 
             if 'first_name' in userdata:
                 logger.info('  * first_name: %s' % (userdata['first_name']))
@@ -85,19 +85,6 @@ def load_participations(path):
             if 'last_name' in userdata:
                 logger.info('  * last_name: %s' % (userdata['last_name']))
                 user.last_name = userdata['last_name']
-
-            if 'team' in userdata:
-                team = session.query(Team).filter(Team.code == userdata['team']['code']).first()
-                if team is None:
-                    team = Team(code=userdata['team']['code'], name=userdata['team']['name'])
-                    logger.info('  Creating new team: %s' % (team.code))
-                    session.add(team)
-                else:
-                    logger.info('  Using existing team: %s' % (team.code))
-                if 'name' in userdata['team']:
-                    logger.info('  * name: %s' % (userdata['team']['name']))
-                    team.name = userdata['team']['name']
-                user.team = team
 
             participation = session.query(Participation).join(Participation.user).filter(Participation.contest == contest).filter(User.username == user.username).first()
             if participation is None:
@@ -125,6 +112,19 @@ def load_participations(path):
             if 'unrestricted' in entry:
                 logger.info('  * unrestricted: %s' % (entry['unrestricted']))
                 participation.unrestricted = entry['unrestricted']
+
+            if 'team' in userdata:
+                team = session.query(Team).filter(Team.code == userdata['team']['code']).first()
+                if team is None:
+                    team = Team(code=userdata['team']['code'], name=userdata['team']['name'])
+                    logger.info('  Creating new team: %s' % (team.code))
+                    session.add(team)
+                else:
+                    logger.info('  Using existing team: %s' % (team.code))
+                if 'name' in userdata['team']:
+                    logger.info('  * name: %s' % (userdata['team']['name']))
+                    team.name = userdata['team']['name']
+                participation.team = team
 
         session.commit()
 
