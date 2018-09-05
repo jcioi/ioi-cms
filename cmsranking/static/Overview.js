@@ -164,10 +164,15 @@ var Overview = new function () {
             self.rank_axis.node.setAttribute("stroke", self.rank_axis.node.getAttribute("fill"));
             self.rank_axis.node.setAttribute("fill", "none");
 
-            setInterval(() => {
-                self.rank_axis.attr(
-                    {"stroke": "#" + Math.random().toString(16).slice(2,8)});
-            }, 100);
+            var tika = () => {
+                self.paper.canvas.removeEventListener('mouseover', tika);
+                setInterval(() => {
+                    self.rank_axis.attr({
+                        "stroke": "#" + Math.random().toString(16).slice(2,8)
+                    });
+                }, 100);
+            };
+            self.paper.canvas.addEventListener('mouseover', tika);
         }
     };
 
