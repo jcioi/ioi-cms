@@ -550,7 +550,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         if task_type == 'batch':
 
             assign(dataset, conf, 'time_limit', float)
-            assign(dataset, conf, 'memory_limit', float)
+            assign(dataset, conf, 'memory_limit', int)
 
             task['submission_format'] = ["%s.%%l" % name]
             dataset['task_type'] = 'Batch'
@@ -568,7 +568,7 @@ class ImprovedImojLoader(ContestLoader, TaskLoader, UserLoader):
         elif task_type == 'communication':
 
             assign(dataset, conf, 'time_limit', float)
-            assign(dataset, conf, 'memory_limit', float)
+            assign(dataset, conf, 'memory_limit', int)
 
             if not stubs:
                 logger.critical("stub is required for communication task")
